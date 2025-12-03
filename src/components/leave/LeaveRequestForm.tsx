@@ -53,21 +53,21 @@ const LeaveRequestForm = () => {
       setCustomLeaveTypes(typesData || []);
 
       // Load approvers (all users with leader role)
-      const { data: approverId_data, error: approversError } = await supabase
+      const { data: leaderRoles, error: leaderError } = await supabase
         .from('user_roles')
-        .select('user_id, profiles:user_id(id, first_name, last_name, email)')
+        .select('user_id')
         .eq('role', 'leader');
 
-      if (approverId_data) {
-        const approversList = approverId_data
-          .filter((item: any) => item.profiles)
-          .map((item: any) => ({
-            id: item.user_id,
-            first_name: item.profiles.first_name,
-            last_name: item.profiles.last_name,
-            email: item.profiles.email
-          }));
-        setApprovers(approversList);
+      if (leaderRoles && leaderRoles.length > 0) {
+        const leaderIds = leaderRoles.map(r => r.user_id);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', leaderIds);
+
+        if (profilesData) {
+          setApprovers(profilesData);
+        }
       }
 
       // Load shifts
