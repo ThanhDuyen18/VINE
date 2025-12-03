@@ -8,9 +8,7 @@ import RoleManagement from "@/components/organization/RoleManagement";
 import AttendanceSettings from "@/components/organization/AttendanceSettings";
 import TeamsManagement from "@/components/organization/TeamsManagement";
 import ShiftsManagement from "@/components/organization/ShiftsManagement";
-import LeaderTeamDashboard from "@/components/organization/LeaderTeamDashboard";
 import LeaderTeamMembers from "@/components/organization/LeaderTeamMembers";
-import TeamLeaveCalendar from "@/components/organization/TeamLeaveCalendar";
 
 const Organization = () => {
   const [role, setRole] = useState<UserRole>('staff');
@@ -43,27 +41,12 @@ const Organization = () => {
         <div className="space-y-6 animate-fade-in pb-20 md:pb-6">
           <div className="mb-2">
             <h2 className="text-4xl font-heading font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-              Team Management
+              Team Members
             </h2>
-            <p className="text-muted-foreground mt-2">Manage your team, track attendance and manage leave requests</p>
+            <p className="text-muted-foreground mt-2">View and manage your team members</p>
           </div>
 
-          <Tabs defaultValue="dashboard" className="w-full">
-            <TabsList className="bg-secondary shadow-soft">
-              <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Dashboard</TabsTrigger>
-              <TabsTrigger value="members" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Team Members</TabsTrigger>
-              <TabsTrigger value="calendar" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Leave Calendar</TabsTrigger>
-            </TabsList>
-            <TabsContent value="dashboard" className="mt-6">
-              <LeaderTeamDashboard />
-            </TabsContent>
-            <TabsContent value="members" className="mt-6">
-              <LeaderTeamMembers />
-            </TabsContent>
-            <TabsContent value="calendar" className="mt-6">
-              <TeamLeaveCalendar />
-            </TabsContent>
-          </Tabs>
+          <LeaderTeamMembers />
         </div>
       </DashboardLayout>
     );
