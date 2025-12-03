@@ -3,9 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUser, getUserProfile } from "@/lib/auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SkeletonTable } from "@/components/ui/skeleton-table";
 import { useToast } from "@/hooks/use-toast";
-import { Users } from "lucide-react";
+import { Users, Trash2, Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface TeamMember {
   id: string;
