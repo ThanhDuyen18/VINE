@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Edit2, Trash2, Plus, MapPin, Users, Monitor, X } from "lucide-react";
+import { Edit2, Trash2, Plus, MapPin, Monitor, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -58,11 +58,8 @@ const RoomManagement = () => {
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [participantsOpen, setParticipantsOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [roomParticipants, setRoomParticipants] = useState<string[]>([]);
-  const [searchParticipant, setSearchParticipant] = useState("");
   const { toast } = useToast();
 
   // Form states
@@ -83,6 +80,7 @@ const RoomManagement = () => {
       const { data, error } = await supabase
         .from('meeting_rooms')
         .select('*')
+        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
@@ -357,15 +355,6 @@ const RoomManagement = () => {
                 </Button>
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => openParticipantsDialog(room)}
-                  className="flex-1"
-                >
-                  <Users className="h-4 w-4 mr-1" />
-                  Manage
-                </Button>
-                <Button
-                  size="sm"
                   variant="destructive"
                   onClick={() => {
                     setSelectedRoom(room);
@@ -447,105 +436,6 @@ const RoomManagement = () => {
             <Button onClick={selectedRoom ? handleUpdate : handleCreate}>
               {selectedRoom ? 'Update' : 'Create'} Room
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Participants Management Dialog */}
-      <Dialog open={participantsOpen} onOpenChange={setParticipantsOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Room Participants</DialogTitle>
-            <DialogDescription>
-              Add or remove participants for {selectedRoom?.name}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="search-participant">Search Employees</Label>
-              <Input
-                id="search-participant"
-                placeholder="Search by name or email..."
-                value={searchParticipant}
-                onChange={(e) => setSearchParticipant(e.target.value)}
-              />
-            </div>
-
-            {/* Available Users */}
-            <div className="border rounded-lg p-4">
-              <h4 className="font-semibold mb-3">Available Employees</h4>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-2 rounded hover:bg-muted"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={user.avatar_url || ""} />
-                        <AvatarFallback>{getInitials(user.first_name, user.last_name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="text-sm">
-                        <p className="font-medium">{user.first_name} {user.last_name}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={roomParticipants.includes(user.id) ? "default" : "outline"}
-                      onClick={() =>
-                        roomParticipants.includes(user.id)
-                          ? handleRemoveParticipant(user.id)
-                          : handleAddParticipant(user.id)
-                      }
-                    >
-                      {roomParticipants.includes(user.id) ? (
-                        <>
-                          <X className="h-4 w-4 mr-1" />
-                          Remove
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Selected Participants */}
-            {roomParticipants.length > 0 && (
-              <div className="border rounded-lg p-4 bg-muted/50">
-                <h4 className="font-semibold mb-3">Selected ({roomParticipants.length})</h4>
-                <div className="flex flex-wrap gap-2">
-                  {roomParticipants.map((userId) => {
-                    const user = allUsers.find(u => u.id === userId);
-                    return user ? (
-                      <Badge key={userId} variant="secondary" className="px-3 py-1">
-                        {user.first_name} {user.last_name}
-                        <button
-                          onClick={() => handleRemoveParticipant(userId)}
-                          className="ml-2 text-xs hover:text-destructive"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ) : null;
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setParticipantsOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={saveParticipants}>Save Participants</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

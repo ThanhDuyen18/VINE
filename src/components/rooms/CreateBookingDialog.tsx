@@ -28,6 +28,9 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
   useEffect(() => {
     if (open) {
       fetchRooms();
+      const today = new Date().toISOString().split('T')[0];
+      setStartTime(`${today}T09:00`);
+      setEndTime(`${today}T10:00`);
     }
   }, [open]);
 
@@ -75,6 +78,42 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
     try {
       const user = await getCurrentUser();
       if (!user) throw new Error("Not authenticated");
+
+      if (!title || !roomId || !startTime || !endTime) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      const startDate = startTime.split('T')[0];
+      const endDate = endTime.split('T')[0];
+
+      if (startDate !== endDate) {
+        toast({
+          title: "Invalid Date Range",
+          description: "Booking must be on the same day. Please select start and end times on the same date.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      const startDateTime = new Date(startTime).getTime();
+      const endDateTime = new Date(endTime).getTime();
+
+      if (startDateTime >= endDateTime) {
+        toast({
+          title: "Invalid Time Range",
+          description: "End time must be after start time",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
 
       const hasConflict = await checkTimeConflict(roomId, startTime, endTime);
       if (hasConflict) {

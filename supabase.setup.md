@@ -229,6 +229,19 @@ CREATE TABLE IF NOT EXISTS public.leave_requests (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- NOTIFICATIONS: User notifications system
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  link TEXT,
+  read BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- AUDIT_LOGS: System audit trail
 CREATE TABLE IF NOT EXISTS public.audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -257,6 +270,7 @@ ALTER TABLE public.meeting_rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.room_bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leave_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leave_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- ========================================================
@@ -364,6 +378,9 @@ CREATE TRIGGER update_leave_requests_updated_at BEFORE UPDATE ON public.leave_re
 
 DROP TRIGGER IF EXISTS update_leave_types_updated_at ON public.leave_types;
 CREATE TRIGGER update_leave_types_updated_at BEFORE UPDATE ON public.leave_types FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_notifications_updated_at ON public.notifications;
+CREATE TRIGGER update_notifications_updated_at BEFORE UPDATE ON public.notifications FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- ========================================================
 -- 7) ROW LEVEL SECURITY (RLS) POLICIES
@@ -514,6 +531,16 @@ CREATE POLICY "Users can update their pending requests" ON public.leave_requests
 CREATE POLICY "Leaders and admins can update leave requests" ON public.leave_requests FOR UPDATE USING (
  public.has_role(auth.uid(), 'leader') OR public.has_role(auth.uid(), 'admin')
 );
+
+-- NOTIFICATIONS: Notification visibility and management
+DROP POLICY IF EXISTS "Users can view their own notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Users can update their own notifications" ON public.notifications;
+DROP POLICY IF EXISTS "System can insert notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Admins can manage all notifications" ON public.notifications;
+CREATE POLICY "Users can view their own notifications" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own notifications" ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "System can insert notifications" ON public.notifications FOR INSERT WITH CHECK (true);
+CREATE POLICY "Admins can manage all notifications" ON public.notifications FOR ALL USING (public.has_role(auth.uid(), 'admin'));
 
 -- AUDIT_LOGS: Audit log visibility
 DROP POLICY IF EXISTS "Admins can view audit logs" ON public.audit_logs;
@@ -675,18 +702,52 @@ ADD COLUMN IF NOT EXISTS custom_type_id UUID REFERENCES public.leave_types(id) O
 -- (Giữ nguyên phần hướng dẫn Admin Queries)
 
 -- ========================================================
--- 11) SETUP COMPLETE & FINAL CONFIGURATION
+-- 11) SEED DATA & DEFAULT VALUES
+-- ========================================================
+
+-- Initialize default shifts (AM/PM)
+INSERT INTO public.shifts (name, start_time, end_time)
+VALUES
+  ('AM', '08:00:00'::TIME, '12:00:00'::TIME),
+  ('PM', '13:00:00'::TIME, '17:00:00'::TIME)
+ON CONFLICT DO NOTHING;
+
+-- ========================================================
+-- 12) SETUP COMPLETE & FINAL CONFIGURATION
 -- ========================================================
 
 -- BỔ SUNG: Cấu hình bảo mật cho hàm has_role để hỗ trợ Edge Function
 -- (Ngăn chặn việc tìm kiếm đường dẫn nếu không phải là Admin/Service Role)
 ALTER FUNCTION public.has_role(uuid, app_role) SET search_path TO public, auth, pg_temp;
 
+-- ========================================================
+-- USEFUL SQL QUERIES FOR ADMINISTRATION & DEBUGGING
+-- ========================================================
+
+-- Get all tables with row counts
+-- SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) FROM pg_tables
+-- WHERE schemaname = 'public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+
+-- Verify RLS is enabled on critical tables
+-- SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN (
+--   'profiles', 'tasks', 'room_bookings', 'leave_requests', 'attendance'
+-- );
+
+-- Check default shifts exist
+-- SELECT id, name, start_time, end_time FROM public.shifts ORDER BY start_time;
+
+-- Get admin users
+-- SELECT p.id, p.email, p.first_name, p.last_name, ur.role
+-- FROM profiles p
+-- LEFT JOIN user_roles ur ON p.id = ur.user_id
+-- WHERE ur.role = 'admin';
 
 -- Database is now fully configured with:
 -- ✓ All tables created with proper relationships
 -- ✓ RLS policies finalized and deployed
 -- ✓ Tasks table updated to preserve history (ON DELETE SET NULL)
+-- ✓ Default shifts (AM/PM) initialized
+-- ✓ Storage policies for file uploads
 --
 -- Next steps:
 -- 1. Create storage buckets: "avatars" and "documents"
@@ -694,3 +755,4 @@ ALTER FUNCTION public.has_role(uuid, app_role) SET search_path TO public, auth, 
 -- 3. Set up storage policies for avatars and documents
 -- 4. Test all RLS policies thoroughly
 -- 5. Monitor database activity for any suspicious patterns
+-- 6. Verify default shifts were created with: SELECT * FROM public.shifts;

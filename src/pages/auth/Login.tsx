@@ -24,7 +24,14 @@ const Login = () => {
     const checkUser = async () => {
       const user = await getCurrentUser();
       if (user) {
-        navigate("/dashboard");
+        const approvalStatus = await checkUserApprovalStatus(user.id);
+        if (!approvalStatus.is_approved && !approvalStatus.approval_rejected) {
+          navigate("/pending");
+        } else if (approvalStatus.approval_rejected) {
+          navigate("/pending");
+        } else {
+          navigate("/dashboard");
+        }
       }
     };
     checkUser();
