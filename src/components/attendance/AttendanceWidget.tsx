@@ -143,21 +143,38 @@ const AttendanceWidget = () => {
 
   const handleCheckIn = async () => {
     if (!userId) return;
-    
+
     setIsLoading(true);
     try {
-      const location = await getLocation();
-      
+      const timestamp = new Date().toISOString();
+
+      // Insert immediately without waiting for location
       const { error } = await supabase
         .from('attendance')
         .insert({
           user_id: userId,
           type: 'check_in',
-          location: location,
-          timestamp: new Date().toISOString()
+          location: null,
+          timestamp: timestamp
         });
 
       if (error) throw error;
+
+      // Fetch location asynchronously in the background (don't block UI)
+      getLocation().then(location => {
+        if (location && location !== "Location unavailable") {
+          supabase
+            .from('attendance')
+            .update({ location })
+            .eq('user_id', userId)
+            .eq('type', 'check_in')
+            .eq('timestamp', timestamp)
+            .catch(err => console.error('Failed to update location:', err));
+        }
+      });
+
+      // Reload today's records
+      await loadTodayAttendance(userId);
 
       toast({
         title: "Checked In Successfully",
@@ -176,28 +193,42 @@ const AttendanceWidget = () => {
 
   const handleCheckOut = async () => {
     if (!userId) return;
-    
+
     setIsLoading(true);
     try {
-      const location = await getLocation();
-      
+      const timestamp = new Date().toISOString();
+
+      // Insert immediately without waiting for location
       const { error } = await supabase
         .from('attendance')
         .insert({
           user_id: userId,
           type: 'check_out',
-          location: location,
-          timestamp: new Date().toISOString()
+          location: null,
+          timestamp: timestamp
         });
 
       if (error) throw error;
+
+      // Fetch location asynchronously in the background
+      getLocation().then(location => {
+        if (location && location !== "Location unavailable") {
+          supabase
+            .from('attendance')
+            .update({ location })
+            .eq('user_id', userId)
+            .eq('type', 'check_out')
+            .eq('timestamp', timestamp)
+            .catch(err => console.error('Failed to update location:', err));
+        }
+      });
 
       // Calculate hours worked today
       const checkInRecord = todayRecords.find(r => r.type === 'check_in');
       if (checkInRecord) {
         const hours = differenceInHours(new Date(), new Date(checkInRecord.timestamp));
         const minutes = differenceInMinutes(new Date(), new Date(checkInRecord.timestamp)) % 60;
-        
+
         toast({
           title: "Checked Out Successfully",
           description: `Great work! You worked ${hours}h ${minutes}m today`,
@@ -208,6 +239,9 @@ const AttendanceWidget = () => {
           description: `See you tomorrow!`,
         });
       }
+
+      // Reload today's records
+      await loadTodayAttendance(userId);
     } catch (error: any) {
       toast({
         variant: "destructive",
