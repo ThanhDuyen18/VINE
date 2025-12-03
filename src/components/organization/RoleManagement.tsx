@@ -41,7 +41,7 @@ const RoleManagement = () => {
     
 
 // Edge Function URL chính xác
-const EDGE_FUNCTION_URL = 'https://yydtjvlrhgnvcqkdailc.supabase.co/functions/v1/delete-user-admin';
+const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1/delete-user-admin';
 
     // --- HELPER FUNCTION (ĐƯỢC DI CHUYỂN VÀO TRONG COMPONENT) ---
     // Fix lỗi ReferenceError: getInitials is not defined

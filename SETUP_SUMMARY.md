@@ -267,9 +267,9 @@ src/
 
 ```env
 # Already configured in system
-VITE_SUPABASE_URL=https://yydtjvlrhgnvcqkdailc.supabase.co
+VITE_SUPABASE_URL=https://tyverlryifverobjwauo.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-VITE_SUPABASE_PROJECT_ID=yydtjvlrhgnvcqkdailc
+VITE_SUPABASE_PROJECT_ID=tyverlryifverobjwauo
 ```
 
 ## Key Takeaways
