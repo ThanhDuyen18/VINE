@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import UsersManagement from "@/components/organization/UsersManagement";
 import RoleManagement from "@/components/organization/RoleManagement";
 import AttendanceSettings from "@/components/organization/AttendanceSettings";
+import TeamsManagement from "@/components/organization/TeamsManagement";
+import ShiftsManagement from "@/components/organization/ShiftsManagement";
 
 const Organization = () => {
   const [role, setRole] = useState<UserRole>('staff');
