@@ -922,3 +922,72 @@ ALTER FUNCTION public.has_role(uuid, app_role) SET search_path TO public, auth, 
 -- ========================================================
 -- 17) VERIFICATION QUERIES
 -- ========================================================
+--
+-- Run these queries to verify your database setup:
+--
+-- Verify default shifts exist:
+-- SELECT id, name, start_time, end_time FROM public.shifts ORDER BY start_time;
+--
+-- Get all users with their roles:
+-- SELECT
+--   p.id,
+--   p.first_name,
+--   p.last_name,
+--   p.email,
+--   ur.role,
+--   p.is_approved,
+--   p.approval_rejected
+-- FROM profiles p
+-- LEFT JOIN user_roles ur ON p.id = ur.user_id
+-- ORDER BY p.created_at DESC;
+--
+-- Get pending users waiting for approval:
+-- SELECT id, first_name, last_name, email, created_at
+-- FROM profiles
+-- WHERE is_approved = false AND approval_rejected = false
+-- ORDER BY created_at ASC;
+--
+-- Get admin users:
+-- SELECT p.id, p.email, p.first_name, p.last_name, ur.role
+-- FROM profiles p
+-- LEFT JOIN user_roles ur ON p.id = ur.user_id
+-- WHERE ur.role = 'admin';
+--
+-- Get all tables row counts:
+-- SELECT
+--   schemaname,
+--   tablename,
+--   n_live_tup as row_count
+-- FROM pg_stat_user_tables
+-- WHERE schemaname = 'public'
+-- ORDER BY n_live_tup DESC;
+--
+-- Check if RLS is enabled on all public tables:
+-- SELECT
+--   tablename,
+--   rowsecurity as rls_enabled
+-- FROM pg_tables
+-- WHERE schemaname = 'public'
+-- ORDER BY tablename;
+--
+-- Get all RLS policies:
+-- SELECT
+--   schemaname,
+--   tablename,
+--   policyname
+-- FROM pg_policies
+-- WHERE schemaname = 'public'
+-- ORDER BY tablename, policyname;
+--
+-- ========================================================
+-- DATABASE IS NOW READY FOR USE
+-- ========================================================
+--
+-- Your Vine HRM database is fully configured!
+-- All tables, functions, triggers, and RLS policies are in place.
+--
+-- IMPORTANT REMAINING STEPS:
+-- 1. Create storage buckets (see section 13 above)
+-- 2. (Optional) Deploy Edge Function for user deletion (see section 14)
+-- 3. Sign up first user and approve them as admin
+-- 4. Start using the application!
