@@ -8,9 +8,7 @@ import RoleManagement from "@/components/organization/RoleManagement";
 import AttendanceSettings from "@/components/organization/AttendanceSettings";
 import TeamsManagement from "@/components/organization/TeamsManagement";
 import ShiftsManagement from "@/components/organization/ShiftsManagement";
-import LeaderTeamDashboard from "@/components/organization/LeaderTeamDashboard";
 import LeaderTeamMembers from "@/components/organization/LeaderTeamMembers";
-import TeamLeaveCalendar from "@/components/organization/TeamLeaveCalendar";
 
 const Organization = () => {
   const [role, setRole] = useState<UserRole>('staff');
