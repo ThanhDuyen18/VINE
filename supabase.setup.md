@@ -379,6 +379,9 @@ CREATE TRIGGER update_leave_requests_updated_at BEFORE UPDATE ON public.leave_re
 DROP TRIGGER IF EXISTS update_leave_types_updated_at ON public.leave_types;
 CREATE TRIGGER update_leave_types_updated_at BEFORE UPDATE ON public.leave_types FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_notifications_updated_at ON public.notifications;
+CREATE TRIGGER update_notifications_updated_at BEFORE UPDATE ON public.notifications FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
 -- ========================================================
 -- 7) ROW LEVEL SECURITY (RLS) POLICIES
 -- ========================================================
