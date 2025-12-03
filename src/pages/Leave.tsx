@@ -48,7 +48,9 @@ const Leave = () => {
             {role === 'admin' && (
               <TabsTrigger value="types" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Leave Types</TabsTrigger>
             )}
-            <TabsTrigger value="request" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">New Request</TabsTrigger>
+            {role !== 'admin' && (
+              <TabsTrigger value="request" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">New Request</TabsTrigger>
+            )}
             <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">History</TabsTrigger>
           </TabsList>
           {role === 'admin' && (
@@ -56,9 +58,11 @@ const Leave = () => {
               <LeaveTypeManagement />
             </TabsContent>
           )}
-          <TabsContent value="request" className="mt-6">
-            <LeaveRequestForm />
-          </TabsContent>
+          {role !== 'admin' && (
+            <TabsContent value="request" className="mt-6">
+              <LeaveRequestForm />
+            </TabsContent>
+          )}
           <TabsContent value="history" className="mt-6">
             <LeaveHistory role={role} />
           </TabsContent>

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Leaf, Users, CheckSquare, Calendar, TrendingUp, Shield, Zap } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, checkUserApprovalStatus } from "@/lib/auth";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -11,7 +11,18 @@ const Index = () => {
     const checkAuth = async () => {
       const user = await getCurrentUser();
       if (user) {
-        navigate("/dashboard");
+        const approvalStatus = await checkUserApprovalStatus(user.id);
+
+        // If approved, go to dashboard
+        if (approvalStatus.is_approved) {
+          navigate("/dashboard");
+        } else if (approvalStatus.approval_rejected) {
+          // If rejected, show pending page
+          navigate("/pending");
+        } else {
+          // If not yet approved, redirect to login
+          navigate("/auth/login");
+        }
       }
     };
     checkAuth();

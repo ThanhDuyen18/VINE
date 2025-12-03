@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 interface TaskColumn {
   id: string;
@@ -50,6 +51,17 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, columns = [] }: C
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate title
+    if (!title.trim()) {
+      toast({
+        title: "Error",
+        description: "Task title is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -58,32 +70,36 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, columns = [] }: C
 
       const finalColumnId = columnId || columns[0]?.id || null;
 
-      const { error } = await supabase.from('tasks').insert([{
-        title,
-        description: description || null,
+      const { data, error } = await supabase.from('tasks').insert([{
+        title: title.trim(),
+        description: description?.trim() || null,
         priority: priority as any,
         deadline: deadline || null,
         assignee_id: assigneeId || null,
         creator_id: user.id,
         column_id: finalColumnId,
         status: 'todo'
-      }]);
+      }]).select();
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error("Task was not created");
+      }
 
       toast({
         title: "Success",
         description: "Task created successfully"
       });
 
+      resetForm();
       onTaskCreated();
       onOpenChange(false);
-      resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating task:', error);
       toast({
         title: "Error",
-        description: "Failed to create task",
+        description: error?.message || "Failed to create task",
         variant: "destructive"
       });
     } finally {
@@ -189,10 +205,11 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, columns = [] }: C
           )}
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {loading ? "Creating..." : "Create Task"}
             </Button>
           </div>

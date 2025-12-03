@@ -107,30 +107,36 @@ const Dashboard = () => {
   };
 
   const loadAdminStats = async () => {
-    // Load company-wide stats
+    // Load company-wide stats (excluding admin's personal stats)
     const { data: tasks } = await supabase
       .from('tasks')
-      .select('status');
+      .select('status')
+      .neq('creator_id', (await getCurrentUser())?.id);
 
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('is_approved');
+      .select('is_approved, annual_leave_balance');
 
     const { data: attendance } = await supabase
       .from('attendance')
-      .select('*');
+      .select('type')
+      .order('timestamp', { ascending: false })
+      .limit(100);
 
     const totalTasks = tasks?.length || 0;
     const completedTasks = tasks?.filter(t => t.status === 'done').length || 0;
     const totalUsers = profiles?.length || 0;
     const approvedUsers = profiles?.filter(p => p.is_approved).length || 0;
-    const pendingApproval = totalUsers - approvedUsers;
+    const avgLeaveBalance = profiles?.length ? Math.round(
+      (profiles.reduce((sum, p) => sum + (p.annual_leave_balance || 0), 0) / profiles.length) * 10
+    ) / 10 : 0;
 
     setStats(prev => ({
       ...prev,
       totalTasks,
       completedTasks,
-      pendingTasks: totalTasks - completedTasks
+      pendingTasks: totalTasks - completedTasks,
+      upcomingMeetings: approvedUsers
     }));
   };
 

@@ -4,7 +4,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import {
   Dialog,
@@ -23,68 +22,60 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Plus, Edit2, Trash2, Loader2 } from "lucide-react";
-import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
-interface Team {
+interface Shift {
   id: string;
   name: string;
-  description: string | null;
-  leader_id: string | null;
+  start_time: string;
+  end_time: string;
   created_at: string;
   updated_at: string;
 }
 
-interface User {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string;
-}
-
-const TeamsManagement = () => {
+const ShiftsManagement = () => {
   const { toast } = useToast();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    description: "",
-    leader_id: "",
+    start_time: "",
+    end_time: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchTeams();
-    fetchUsers();
+    fetchShifts();
   }, []);
 
-  const fetchTeams = async () => {
+  const fetchShifts = async () => {
     try {
       const { data, error } = await supabase
-        .from('teams')
+        .from('shifts')
         .select('*')
-        .order('name');
+        .order('start_time');
 
       if (error) throw error;
-      setTeams(data || []);
+      
+      const existingShifts = data || [];
+      setShifts(existingShifts);
+      
+      // Initialize default shifts if none exist
+      if (existingShifts.length === 0 && !initialized) {
+        await initializeDefaultShifts();
+        setInitialized(true);
+      }
     } catch (error) {
-      console.error('Error fetching teams:', error);
+      console.error('Error fetching shifts:', error);
       toast({
         title: "Error",
-        description: "Failed to load teams",
+        description: "Failed to load shifts",
         variant: "destructive"
       });
     } finally {
@@ -92,40 +83,59 @@ const TeamsManagement = () => {
     }
   };
 
-  const fetchUsers = async () => {
+  const initializeDefaultShifts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .order('first_name');
+      const defaultShifts = [
+        { name: "AM", start_time: "08:00", end_time: "12:00" },
+        { name: "PM", start_time: "13:00", end_time: "17:00" },
+      ];
+
+      const { error } = await supabase
+        .from('shifts')
+        .insert(defaultShifts);
 
       if (error) throw error;
-      setUsers(data || []);
+
+      toast({
+        title: "Success",
+        description: "Default shifts (AM, PM) created"
+      });
+
+      await fetchShifts();
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error initializing default shifts:', error);
     }
   };
 
   const handleOpenCreate = () => {
-    setFormData({ name: "", description: "", leader_id: "" });
+    setFormData({ name: "", start_time: "", end_time: "" });
     setCreateOpen(true);
   };
 
-  const handleOpenEdit = (team: Team) => {
-    setSelectedTeam(team);
+  const handleOpenEdit = (shift: Shift) => {
+    setSelectedShift(shift);
     setFormData({
-      name: team.name,
-      description: team.description || "",
-      leader_id: team.leader_id || "",
+      name: shift.name,
+      start_time: shift.start_time,
+      end_time: shift.end_time,
     });
     setEditOpen(true);
   };
 
   const handleCreate = async () => {
-    if (!formData.name.trim()) {
+    if (!formData.name.trim() || !formData.start_time || !formData.end_time) {
       toast({
         title: "Error",
-        description: "Team name is required",
+        description: "All fields are required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.start_time >= formData.end_time) {
+      toast({
+        title: "Error",
+        description: "Start time must be before end time",
         variant: "destructive"
       });
       return;
@@ -133,26 +143,26 @@ const TeamsManagement = () => {
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('teams').insert([{
+      const { error } = await supabase.from('shifts').insert([{
         name: formData.name,
-        description: formData.description || null,
-        leader_id: formData.leader_id || null,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
       }]);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Team created successfully"
+        description: "Shift created successfully"
       });
       
       setCreateOpen(false);
-      fetchTeams();
+      fetchShifts();
     } catch (error) {
-      console.error('Error creating team:', error);
+      console.error('Error creating shift:', error);
       toast({
         title: "Error",
-        description: "Failed to create team",
+        description: "Failed to create shift",
         variant: "destructive"
       });
     } finally {
@@ -161,10 +171,19 @@ const TeamsManagement = () => {
   };
 
   const handleUpdate = async () => {
-    if (!selectedTeam || !formData.name.trim()) {
+    if (!selectedShift || !formData.name.trim() || !formData.start_time || !formData.end_time) {
       toast({
         title: "Error",
-        description: "Team name is required",
+        description: "All fields are required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.start_time >= formData.end_time) {
+      toast({
+        title: "Error",
+        description: "Start time must be before end time",
         variant: "destructive"
       });
       return;
@@ -173,28 +192,28 @@ const TeamsManagement = () => {
     setSubmitting(true);
     try {
       const { error } = await supabase
-        .from('teams')
+        .from('shifts')
         .update({
           name: formData.name,
-          description: formData.description || null,
-          leader_id: formData.leader_id || null,
+          start_time: formData.start_time,
+          end_time: formData.end_time,
         })
-        .eq('id', selectedTeam.id);
+        .eq('id', selectedShift.id);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Team updated successfully"
+        description: "Shift updated successfully"
       });
       
       setEditOpen(false);
-      fetchTeams();
+      fetchShifts();
     } catch (error) {
-      console.error('Error updating team:', error);
+      console.error('Error updating shift:', error);
       toast({
         title: "Error",
-        description: "Failed to update team",
+        description: "Failed to update shift",
         variant: "destructive"
       });
     } finally {
@@ -203,49 +222,35 @@ const TeamsManagement = () => {
   };
 
   const handleDelete = async () => {
-    if (!selectedTeam) return;
+    if (!selectedShift) return;
 
     setSubmitting(true);
     try {
       const { error } = await supabase
-        .from('teams')
+        .from('shifts')
         .delete()
-        .eq('id', selectedTeam.id);
+        .eq('id', selectedShift.id);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Team deleted successfully"
+        description: "Shift deleted successfully"
       });
       
       setDeleteConfirmOpen(false);
-      setSelectedTeam(null);
-      fetchTeams();
+      setSelectedShift(null);
+      fetchShifts();
     } catch (error) {
-      console.error('Error deleting team:', error);
+      console.error('Error deleting shift:', error);
       toast({
         title: "Error",
-        description: "Failed to delete team",
+        description: "Failed to delete shift",
         variant: "destructive"
       });
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const getLeaderName = (leaderId: string | null) => {
-    if (!leaderId) return '-';
-    const leader = users.find(u => u.id === leaderId);
-    return leader ? `${leader.first_name} ${leader.last_name}` : '-';
-  };
-
-  const getMemberCount = async (teamId: string) => {
-    const { count } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('team_id', teamId);
-    return count || 0;
   };
 
   if (loading) {
@@ -261,40 +266,36 @@ const TeamsManagement = () => {
       <div className="flex justify-end">
         <Button onClick={handleOpenCreate}>
           <Plus className="h-4 w-4 mr-2" />
-          Add Team
+          Add Shift
         </Button>
       </div>
 
-      {teams.length === 0 ? (
+      {shifts.length === 0 ? (
         <Card className="p-8 text-center">
-          <p className="text-muted-foreground">No teams created yet</p>
+          <p className="text-muted-foreground">No shifts created yet</p>
         </Card>
       ) : (
         <div className="border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Team Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Leader</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead>Shift Name</TableHead>
+                <TableHead>Start Time</TableHead>
+                <TableHead>End Time</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {teams.map((team) => (
-                <TableRow key={team.id}>
-                  <TableCell className="font-medium">{team.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{team.description || '-'}</TableCell>
-                  <TableCell>{getLeaderName(team.leader_id)}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {format(new Date(team.created_at), 'MMM dd, yyyy')}
-                  </TableCell>
+              {shifts.map((shift) => (
+                <TableRow key={shift.id}>
+                  <TableCell className="font-medium">{shift.name}</TableCell>
+                  <TableCell>{shift.start_time}</TableCell>
+                  <TableCell>{shift.end_time}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleOpenEdit(team)}
+                      onClick={() => handleOpenEdit(shift)}
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
@@ -302,7 +303,7 @@ const TeamsManagement = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        setSelectedTeam(team);
+                        setSelectedShift(shift);
                         setDeleteConfirmOpen(true);
                       }}
                     >
@@ -319,51 +320,43 @@ const TeamsManagement = () => {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Team</DialogTitle>
-            <DialogDescription>Add a new team to your organization</DialogDescription>
+            <DialogTitle>Create New Shift</DialogTitle>
+            <DialogDescription>Add a new shift to your organization</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="name">Team Name *</Label>
+              <Label htmlFor="shift-name">Shift Name *</Label>
               <Input
-                id="name"
+                id="shift-name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Engineering"
+                placeholder="e.g. Morning, Afternoon, Night"
               />
             </div>
             <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Team description (optional)"
-                rows={3}
+              <Label htmlFor="start-time">Start Time *</Label>
+              <Input
+                id="start-time"
+                type="time"
+                value={formData.start_time}
+                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
               />
             </div>
             <div>
-              <Label htmlFor="leader">Team Leader</Label>
-              <Select value={formData.leader_id} onValueChange={(value) => setFormData({ ...formData, leader_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a team leader" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {users.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.first_name} {user.last_name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="end-time">End Time *</Label>
+              <Input
+                id="end-time"
+                type="time"
+                value={formData.end_time}
+                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={submitting}>
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create Team
+              Create Shift
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -372,51 +365,43 @@ const TeamsManagement = () => {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Team</DialogTitle>
-            <DialogDescription>Update team information</DialogDescription>
+            <DialogTitle>Edit Shift</DialogTitle>
+            <DialogDescription>Update shift information</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit-name">Team Name *</Label>
+              <Label htmlFor="edit-shift-name">Shift Name *</Label>
               <Input
-                id="edit-name"
+                id="edit-shift-name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Engineering"
+                placeholder="e.g. Morning, Afternoon, Night"
               />
             </div>
             <div>
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Team description (optional)"
-                rows={3}
+              <Label htmlFor="edit-start-time">Start Time *</Label>
+              <Input
+                id="edit-start-time"
+                type="time"
+                value={formData.start_time}
+                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
               />
             </div>
             <div>
-              <Label htmlFor="edit-leader">Team Leader</Label>
-              <Select value={formData.leader_id} onValueChange={(value) => setFormData({ ...formData, leader_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a team leader" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {users.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.first_name} {user.last_name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="edit-end-time">End Time *</Label>
+              <Input
+                id="edit-end-time"
+                type="time"
+                value={formData.end_time}
+                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button onClick={handleUpdate} disabled={submitting}>
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Update Team
+              Update Shift
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -425,9 +410,9 @@ const TeamsManagement = () => {
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Team</AlertDialogTitle>
+            <AlertDialogTitle>Delete Shift</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{selectedTeam?.name}"? This action cannot be undone.
+              Are you sure you want to delete the "{selectedShift?.name}" shift? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -441,4 +426,4 @@ const TeamsManagement = () => {
   );
 };
 
-export default TeamsManagement;
+export default ShiftsManagement;

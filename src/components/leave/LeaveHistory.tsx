@@ -5,11 +5,11 @@ import { UserRole } from "@/lib/auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { SkeletonTable } from "@/components/ui/skeleton-table";
 
-// Định nghĩa kiểu dữ liệu cho kết quả JOIN
 interface LeaveRequest {
     id: string;
     user_id: string;
@@ -20,7 +20,6 @@ interface LeaveRequest {
     created_at: string;
     approved_by: string | null;
     approved_at: string | null;
-    // Dữ liệu JOIN từ bảng profiles
     profiles: {
         first_name: string | null;
         last_name: string | null;
@@ -28,12 +27,12 @@ interface LeaveRequest {
 }
 
 const LeaveHistory = ({ role }: { role: UserRole }) => {
-  // Sử dụng kiểu dữ liệu đã định nghĩa
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]); 
   const [loading, setLoading] = useState(true);
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterYear, setFilterYear] = useState("");
   const { toast } = useToast();
 
-  // Dùng useCallback để hàm không bị tạo lại không cần thiết
   const fetchLeaves = useCallback(async () => {
     try {
       const user = await getCurrentUser();
@@ -53,7 +52,6 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
       if (role === 'staff') {
         query = query.eq('user_id', user.id);
       }
-      // RLS Policies سوف تلتر للقادة/المسؤولين
 
       const { data, error } = await query;
       if (error) throw error;
@@ -79,7 +77,7 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchLeaves]); // Dependency array sử dụng fetchLeaves
+  }, [fetchLeaves]);
 
   const handleApprove = async (leaveId: string) => {
     try {
@@ -101,6 +99,8 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
         title: "Success",
         description: "Leave request approved"
       });
+
+      fetchLeaves();
     } catch (error) {
       console.error('Error approving leave:', error);
       toast({
@@ -131,6 +131,8 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
         title: "Success",
         description: "Leave request rejected"
       });
+
+      fetchLeaves();
     } catch (error) {
       console.error('Error rejecting leave:', error);
       toast({
@@ -145,72 +147,122 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
     return <SkeletonTable rows={6} columns={role === 'leader' || role === 'admin' ? 7 : 5} />;
   }
 
+  const filteredLeaves = leaves.filter(leave => {
+    const startDate = new Date(leave.start_date);
+    const leaveMonth = (startDate.getMonth() + 1).toString().padStart(2, '0');
+    const leaveYear = startDate.getFullYear().toString();
+
+    const matchMonth = !filterMonth || leaveMonth === filterMonth;
+    const matchYear = !filterYear || leaveYear === filterYear;
+
+    return matchMonth && matchYear;
+  });
+
   return (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {(role === 'leader' || role === 'admin') && <TableHead>Employee</TableHead>}
-            <TableHead>Type</TableHead>
-            <TableHead>Start Date</TableHead>
-            <TableHead>End Date</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Submitted</TableHead>
-            {(role === 'leader' || role === 'admin') && <TableHead>Actions</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {leaves.map((leave) => (
-            <TableRow key={leave.id}>
-              {(role === 'leader' || role === 'admin') && (
-                <TableCell>
-                  {/** 👇 HIỂN THỊ TÊN ĐẦY ĐỦ TỪ DỮ LIỆU JOIN */}
-                  {leave.profiles ? 
-                        `${leave.profiles.first_name} ${leave.profiles.last_name}` 
-                        : `User ID: ${leave.user_id?.substring(0, 8)}`}
-                </TableCell>
-              )}
-              <TableCell className="capitalize">{leave.type.replace('_', ' ')}</TableCell>
-              <TableCell>{format(new Date(leave.start_date), 'MMM dd, yyyy')}</TableCell>
-              <TableCell>{format(new Date(leave.end_date), 'MMM dd, yyyy')}</TableCell>
-              <TableCell>
-                <Badge
-                  variant={
-                    leave.status === 'approved' ? 'default' :
-                    leave.status === 'rejected' ? 'destructive' : 'secondary'
-                  }
-                >
-                  {leave.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {format(new Date(leave.created_at), 'MMM dd, yyyy')}
-              </TableCell>
-              {(role === 'leader' || role === 'admin') && (
-                <TableCell>
-                  {leave.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleApprove(leave.id)}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleReject(leave.id)}
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                  )}
-                </TableCell>
-              )}
+    <div className="space-y-4">
+      <div className="flex gap-4 flex-wrap items-end">
+        <div>
+          <Label htmlFor="filter-month">Month</Label>
+          <select
+            id="filter-month"
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="mt-1 px-3 py-2 border rounded-md bg-background"
+          >
+            <option value="">All Months</option>
+            {Array.from({ length: 12 }, (_, i) => (
+              <option key={i + 1} value={String(i + 1).padStart(2, '0')}>
+                {new Date(2000, i).toLocaleString('default', { month: 'long' })}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <Label htmlFor="filter-year">Year</Label>
+          <select
+            id="filter-year"
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            className="mt-1 px-3 py-2 border rounded-md bg-background"
+          >
+            <option value="">All Years</option>
+            {Array.from({ length: 5 }, (_, i) => {
+              const year = new Date().getFullYear() - 2 + i;
+              return (
+                <option key={year} value={String(year)}>
+                  {year}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      </div>
+
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {(role === 'leader' || role === 'admin') && <TableHead>Employee</TableHead>}
+              <TableHead>Type</TableHead>
+              <TableHead>Start Date</TableHead>
+              <TableHead>End Date</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Submitted</TableHead>
+              {(role === 'leader' || role === 'admin') && <TableHead>Actions</TableHead>}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {filteredLeaves.map((leave) => (
+              <TableRow key={leave.id}>
+                {(role === 'leader' || role === 'admin') && (
+                  <TableCell>
+                    {leave.profiles ? 
+                      `${leave.profiles.first_name} ${leave.profiles.last_name}` 
+                      : `User ID: ${leave.user_id?.substring(0, 8)}`}
+                  </TableCell>
+                )}
+                <TableCell className="capitalize">{leave.type.replace('_', ' ')}</TableCell>
+                <TableCell>{format(new Date(leave.start_date), 'MMM dd, yyyy')}</TableCell>
+                <TableCell>{format(new Date(leave.end_date), 'MMM dd, yyyy')}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      leave.status === 'approved' ? 'default' :
+                      leave.status === 'rejected' ? 'destructive' : 'secondary'
+                    }
+                  >
+                    {leave.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {format(new Date(leave.created_at), 'MMM dd, yyyy')}
+                </TableCell>
+                {(role === 'leader' || role === 'admin') && (
+                  <TableCell>
+                    {leave.status === 'pending' && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApprove(leave.id)}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleReject(leave.id)}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 };

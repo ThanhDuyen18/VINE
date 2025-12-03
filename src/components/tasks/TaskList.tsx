@@ -19,7 +19,9 @@ const TaskList = ({ role }: { role: UserRole }) => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [taskTypeFilter, setTaskTypeFilter] = useState("all");
   const [users, setUsers] = useState<any[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
 
   const fetchUsers = async () => {
     try {
@@ -39,9 +41,12 @@ const TaskList = ({ role }: { role: UserRole }) => {
       const user = await getCurrentUser();
       if (!user) return;
 
+      setCurrentUserId(user.id);
+
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
+        .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -68,16 +73,23 @@ const TaskList = ({ role }: { role: UserRole }) => {
 
   const getFilteredTasks = () => {
     return tasks.filter(task => {
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      
+
       const matchesStatus = statusFilter === "all" || task.status === statusFilter;
       const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter;
-      const matchesAssignee = assigneeFilter === "all" || 
+      const matchesAssignee = assigneeFilter === "all" ||
         (assigneeFilter === "unassigned" ? !task.assignee_id : task.assignee_id === assigneeFilter);
-      
-      return matchesSearch && matchesStatus && matchesPriority && matchesAssignee;
+
+      let matchesTaskType = true;
+      if (taskTypeFilter === "assigned") {
+        matchesTaskType = task.assignee_id === currentUserId;
+      } else if (taskTypeFilter === "created") {
+        matchesTaskType = task.creator_id === currentUserId;
+      }
+
+      return matchesSearch && matchesStatus && matchesPriority && matchesAssignee && matchesTaskType;
     });
   };
 
@@ -85,17 +97,53 @@ const TaskList = ({ role }: { role: UserRole }) => {
 
   return (
     <div className="space-y-4">
-      <TaskSearchFilter
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
-        priorityFilter={priorityFilter}
-        onPriorityChange={setPriorityFilter}
-        assigneeFilter={assigneeFilter}
-        onAssigneeChange={setAssigneeFilter}
-        users={users}
-      />
+      <div className="space-y-4">
+        <div className="flex gap-4 flex-wrap items-center">
+          <TaskSearchFilter
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            statusFilter={statusFilter}
+            onStatusChange={setStatusFilter}
+            priorityFilter={priorityFilter}
+            onPriorityChange={setPriorityFilter}
+            assigneeFilter={assigneeFilter}
+            onAssigneeChange={setAssigneeFilter}
+            users={users}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => setTaskTypeFilter("all")}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                taskTypeFilter === "all"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              All Tasks
+            </button>
+            <button
+              onClick={() => setTaskTypeFilter("assigned")}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                taskTypeFilter === "assigned"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Assigned to Me
+            </button>
+            <button
+              onClick={() => setTaskTypeFilter("created")}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                taskTypeFilter === "created"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Created by Me
+            </button>
+          </div>
+        </div>
+      </div>
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
@@ -103,6 +151,7 @@ const TaskList = ({ role }: { role: UserRole }) => {
               <TableHead>Task</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>
+              <TableHead>Reporter</TableHead>
               <TableHead>Assignee</TableHead>
               <TableHead>Deadline</TableHead>
               <TableHead>Created</TableHead>
@@ -135,7 +184,20 @@ const TaskList = ({ role }: { role: UserRole }) => {
                   <Badge>{task.priority}</Badge>
                 </TableCell>
                 <TableCell>
-                  {task.assignee_id ? 'Assigned' : 'Unassigned'}
+                  {task.creator_id ? (
+                    (() => {
+                      const creator = users.find(u => u.id === task.creator_id);
+                      return creator ? `${creator.first_name} ${creator.last_name}` : 'Unknown';
+                    })()
+                  ) : '-'}
+                </TableCell>
+                <TableCell>
+                  {task.assignee_id ? (
+                    (() => {
+                      const assignee = users.find(u => u.id === task.assignee_id);
+                      return assignee ? `${assignee.first_name} ${assignee.last_name}` : 'Assigned';
+                    })()
+                  ) : 'Unassigned'}
                 </TableCell>
                 <TableCell>
                   {task.deadline ? format(new Date(task.deadline), 'MMM dd, yyyy') : '-'}

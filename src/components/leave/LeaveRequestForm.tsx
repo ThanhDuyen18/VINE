@@ -51,6 +51,27 @@ const LeaveRequestForm = () => {
     setLoading(true);
 
     try {
+      // Validate dates
+      if (!startDate || !endDate) {
+        toast({
+          title: "Error",
+          description: "Start date and end date are required",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (startDate > endDate) {
+        toast({
+          title: "Error",
+          description: "Start date must be before or equal to end date",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
       const user = await getCurrentUser();
       if (!user) throw new Error("Not authenticated");
 

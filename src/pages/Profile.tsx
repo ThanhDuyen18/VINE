@@ -18,7 +18,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 const profileSchema = z.object({
   first_name: z.string().min(1, "First name is required").max(100),
   last_name: z.string().min(1, "Last name is required").max(100),
-  phone: z.string().optional(),
+  phone: z.string().optional().refine(
+    (val) => !val || /^\d{0,10}$/.test(val),
+    "Phone number must be exactly 10 digits (e.g. 0832686678)"
+  ),
   date_of_birth: z.string().optional(),
 });
 
@@ -269,8 +272,8 @@ export default function Profile() {
 
    const fileName = `${user.id}-cv-${Date.now()}.pdf`;
    // ĐÚNG: SỬ DỤNG FULL PATH CHO STORAGE (documents/user-id-...)
-   const filePath = `documents/${fileName}`; 
-      
+   const filePath = `documents/${fileName}`;
+
       // 1. Upload file
       const { error: uploadError } = await supabase.storage
         .from("documents")
@@ -281,13 +284,13 @@ export default function Profile() {
       // 2. Cập nhật profile (lưu FILE PATH ĐẦY ĐỦ vào DB)
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ cv_url: filePath }) 
+        .update({ cv_url: filePath })
         .eq("id", user.id);
 
       if (updateError) throw updateError;
 
       toast.success("CV uploaded successfully");
-      
+
       // Tối ưu hóa: Cập nhật state cục bộ và tạo Signed URL mới
       setProfile(prevProfile => {
           if (!prevProfile) return null;
@@ -299,10 +302,51 @@ export default function Profile() {
       // Tạo signed URL mới ngay sau khi upload
       const newSignedUrl = await getSignedUrl(filePath);
       setCvSignedUrl(newSignedUrl);
-      
+
     } catch (error) {
       console.error("Error uploading CV:", error);
       toast.error("Failed to upload CV");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCVDelete = async () => {
+    try {
+      if (!profile?.cv_url) return;
+
+      setUploading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Delete from storage
+      const { error: deleteError } = await supabase.storage
+        .from("documents")
+        .remove([profile.cv_url]);
+
+      if (deleteError) throw deleteError;
+
+      // Update profile to remove cv_url
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ cv_url: null })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      toast.success("CV deleted successfully");
+
+      setProfile(prevProfile => {
+        if (!prevProfile) return null;
+        return {
+          ...prevProfile,
+          cv_url: null,
+        };
+      });
+      setCvSignedUrl(null);
+    } catch (error) {
+      console.error("Error deleting CV:", error);
+      toast.error("Failed to delete CV");
     } finally {
       setUploading(false);
     }
@@ -395,24 +439,36 @@ export default function Profile() {
               <div className="flex-1">
                 {profile.cv_url ? (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 p-3 bg-secondary rounded-md">
-                      <FileText className="h-5 w-5 text-primary" />
-                      <a
-                        // SỬ DỤNG SIGNED URL
-                        href={cvSignedUrl || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`text-sm font-medium ${cvSignedUrl ? 'text-primary hover:underline' : 'text-muted-foreground'}`}
-                        onClick={(e) => {
-                            if (!cvSignedUrl) {
-                                e.preventDefault();
-                                toast.warning("Generating temporary URL, please try again soon.");
-                                loadProfile(); // Tải lại để generate Signed URL
-                            }
-                        }}
+                    <div className="flex items-center justify-between gap-2 p-3 bg-secondary rounded-md">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-primary" />
+                        <a
+                          // SỬ DỤNG SIGNED URL
+                          href={cvSignedUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`text-sm font-medium ${cvSignedUrl ? 'text-primary hover:underline' : 'text-muted-foreground'}`}
+                          onClick={(e) => {
+                              if (!cvSignedUrl) {
+                                  e.preventDefault();
+                                  toast.warning("Generating temporary URL, please try again soon.");
+                                  loadProfile(); // Tải lại để generate Signed URL
+                              }
+                          }}
+                        >
+                          {cvSignedUrl ? "View CV (PDF)" : "Loading secure link..."}
+                        </a>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCVDelete}
+                        disabled={uploading}
+                        className="text-destructive hover:text-destructive"
                       >
-                        {cvSignedUrl ? "View CV (PDF)" : "Loading secure link..."}
-                      </a>
+                        Delete
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -501,7 +557,17 @@ export default function Profile() {
                           <FormControl>
                             <div className="relative">
                               <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                              <Input {...field} type="tel" className="pl-10" />
+                              <Input
+                                {...field}
+                                type="tel"
+                                className="pl-10"
+                                maxLength={10}
+                                placeholder="0832686678"
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                  field.onChange(value);
+                                }}
+                              />
                             </div>
                           </FormControl>
                           <FormMessage />
