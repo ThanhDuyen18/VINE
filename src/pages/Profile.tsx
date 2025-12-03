@@ -439,24 +439,36 @@ export default function Profile() {
               <div className="flex-1">
                 {profile.cv_url ? (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 p-3 bg-secondary rounded-md">
-                      <FileText className="h-5 w-5 text-primary" />
-                      <a
-                        // SỬ DỤNG SIGNED URL
-                        href={cvSignedUrl || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`text-sm font-medium ${cvSignedUrl ? 'text-primary hover:underline' : 'text-muted-foreground'}`}
-                        onClick={(e) => {
-                            if (!cvSignedUrl) {
-                                e.preventDefault();
-                                toast.warning("Generating temporary URL, please try again soon.");
-                                loadProfile(); // Tải lại để generate Signed URL
-                            }
-                        }}
+                    <div className="flex items-center justify-between gap-2 p-3 bg-secondary rounded-md">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-primary" />
+                        <a
+                          // SỬ DỤNG SIGNED URL
+                          href={cvSignedUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`text-sm font-medium ${cvSignedUrl ? 'text-primary hover:underline' : 'text-muted-foreground'}`}
+                          onClick={(e) => {
+                              if (!cvSignedUrl) {
+                                  e.preventDefault();
+                                  toast.warning("Generating temporary URL, please try again soon.");
+                                  loadProfile(); // Tải lại để generate Signed URL
+                              }
+                          }}
+                        >
+                          {cvSignedUrl ? "View CV (PDF)" : "Loading secure link..."}
+                        </a>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCVDelete}
+                        disabled={uploading}
+                        className="text-destructive hover:text-destructive"
                       >
-                        {cvSignedUrl ? "View CV (PDF)" : "Loading secure link..."}
-                      </a>
+                        Delete
+                      </Button>
                     </div>
                   </div>
                 ) : (
