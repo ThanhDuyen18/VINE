@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { createTaskNotification } from "@/lib/notifications";
 
 interface TaskColumn {
   id: string;
