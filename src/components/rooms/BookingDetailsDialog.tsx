@@ -211,26 +211,39 @@ const BookingDetailsDialog = ({ booking, open, onOpenChange, onJoinLeave }: Book
             </div>
           )}
 
-          {currentUser && currentUser.id !== creatorInfo?.id && (
-            <Button
-              onClick={handleJoinLeave}
-              disabled={isJoining}
-              className="w-full"
-              variant={hasJoined ? "destructive" : "default"}
-            >
-              {hasJoined ? (
-                <>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Leave Meeting
-                </>
-              ) : (
-                <>
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Join Meeting
-                </>
-              )}
-            </Button>
-          )}
+          <div className="space-y-2">
+            {currentUser && currentUser.id === creatorInfo?.id && booking.status !== 'cancelled' && (
+              <Button
+                onClick={handleCancelBooking}
+                disabled={isCancelling}
+                className="w-full"
+                variant="destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Cancel Booking
+              </Button>
+            )}
+            {currentUser && currentUser.id !== creatorInfo?.id && (
+              <Button
+                onClick={handleJoinLeave}
+                disabled={isJoining}
+                className="w-full"
+                variant={hasJoined ? "destructive" : "default"}
+              >
+                {hasJoined ? (
+                  <>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Leave Meeting
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Join Meeting
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
