@@ -324,6 +324,40 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
     <div className="space-y-4">
       <div className="flex gap-4 flex-wrap items-end">
         <div>
+          <Label htmlFor="filter-status">Status</Label>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="filter-start-date">Start Date</Label>
+          <Input
+            id="filter-start-date"
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label htmlFor="filter-end-date">End Date</Label>
+          <Input
+            id="filter-end-date"
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+            className="mt-1"
+          />
+        </div>
+        <div>
           <Label htmlFor="filter-month">Month</Label>
           <select
             id="filter-month"
