@@ -64,62 +64,85 @@ const MyBookings = () => {
     return <div className="text-muted-foreground">Loading your bookings...</div>;
   }
 
+  const filteredBookings = bookings.filter(booking =>
+    booking.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    booking.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (bookings.length === 0) {
     return <div className="text-muted-foreground text-center py-8">No bookings yet</div>;
   }
 
   return (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Room</TableHead>
-            <TableHead>Start Time</TableHead>
-            <TableHead>End Time</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {bookings.map((booking) => (
-            <TableRow key={booking.id}>
-              <TableCell className="font-medium">{booking.title}</TableCell>
-              <TableCell>Room {booking.room_id?.substring(0, 8)}</TableCell>
-              <TableCell>{format(new Date(booking.start_time), 'MMM dd, yyyy HH:mm')}</TableCell>
-              <TableCell>{format(new Date(booking.end_time), 'MMM dd, yyyy HH:mm')}</TableCell>
-              <TableCell>
-                <Badge
-                  variant={
-                    booking.status === 'approved' ? 'default' :
-                    booking.status === 'rejected' ? 'destructive' :
-                    booking.status === 'cancelled' ? 'outline' : 'secondary'
-                  }
-                >
-                  {booking.status}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {booking.status !== 'cancelled' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCancelBooking(booking.id)}
-                    disabled={cancelling === booking.id}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    {cancelling === booking.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <X className="h-4 w-4" />
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search bookings by title or description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
+      {filteredBookings.length === 0 ? (
+        <div className="text-muted-foreground text-center py-8">No bookings match your search</div>
+      ) : (
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Room</TableHead>
+                <TableHead>Start Time</TableHead>
+                <TableHead>End Time</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredBookings.map((booking) => (
+                <TableRow key={booking.id}>
+                  <TableCell className="font-medium">{booking.title}</TableCell>
+                  <TableCell>Room {booking.room_id?.substring(0, 8)}</TableCell>
+                  <TableCell>{format(new Date(booking.start_time), 'MMM dd, yyyy HH:mm')}</TableCell>
+                  <TableCell>{format(new Date(booking.end_time), 'MMM dd, yyyy HH:mm')}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        booking.status === 'approved' ? 'default' :
+                        booking.status === 'rejected' ? 'destructive' :
+                        booking.status === 'cancelled' ? 'outline' : 'secondary'
+                      }
+                    >
+                      {booking.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {booking.status !== 'cancelled' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCancelBooking(booking.id)}
+                        disabled={cancelling === booking.id}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        {cancelling === booking.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
+                      </Button>
                     )}
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 };
