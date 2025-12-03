@@ -381,6 +381,14 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
                                                 {user.email}
                                             </TableCell>
 
+                                            <TableCell>
+                                                {user.team_name ? (
+                                                    <Badge variant="secondary">{user.team_name}</Badge>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-sm">-</span>
+                                                )}
+                                            </TableCell>
+
                                             {/* CELL XEM CV */}
                                             <TableCell>
                                                 {user.cv_url ? (
