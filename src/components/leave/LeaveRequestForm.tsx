@@ -33,20 +33,64 @@ const LeaveRequestForm = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    loadCustomLeaveTypes();
+    loadData();
   }, []);
 
-  const loadCustomLeaveTypes = async () => {
+  const loadData = async () => {
     try {
-      const { data, error } = await supabase
+      const user = await getCurrentUser();
+      if (!user) return;
+      setCurrentUserId(user.id);
+
+      // Load leave types
+      const { data: typesData, error: typesError } = await supabase
         .from('leave_types')
         .select('id, name')
         .order('name');
 
-      if (error) throw error;
-      setCustomLeaveTypes(data || []);
+      if (typesError) throw typesError;
+      setCustomLeaveTypes(typesData || []);
+
+      // Load approvers (all users with leader role)
+      const { data: approverId_data, error: approversError } = await supabase
+        .from('user_roles')
+        .select('user_id, profiles:user_id(id, first_name, last_name, email)')
+        .eq('role', 'leader');
+
+      if (approverId_data) {
+        const approversList = approverId_data
+          .filter((item: any) => item.profiles)
+          .map((item: any) => ({
+            id: item.user_id,
+            first_name: item.profiles.first_name,
+            last_name: item.profiles.last_name,
+            email: item.profiles.email
+          }));
+        setApprovers(approversList);
+      }
+
+      // Load shifts
+      const { data: shiftsData, error: shiftsError } = await supabase
+        .from('shifts')
+        .select('id, name, start_time, end_time')
+        .order('name');
+
+      if (shiftsError) throw shiftsError;
+      setShifts(shiftsData || []);
+
+      // Load leave balance
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('annual_leave_balance, leave_request_count')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+      if (profileData) {
+        setLeaveBalance((profileData.annual_leave_balance || 12) - (profileData.leave_request_count || 0));
+      }
     } catch (error) {
-      console.error('Error loading custom leave types:', error);
+      console.error('Error loading data:', error);
     } finally {
       setLoadingTypes(false);
     }
