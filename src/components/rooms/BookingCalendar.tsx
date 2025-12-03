@@ -19,8 +19,10 @@ const BookingCalendar = ({ role }: { role: UserRole }) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [creatorInfo, setCreatorInfo] = useState<Map<string, any>>(new Map());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const fetchBookings = async () => {
     try {
