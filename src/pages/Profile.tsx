@@ -146,12 +146,23 @@ export default function Profile() {
 
       // Fetch Team Info
       if (profileData.team_id) {
+        // User is a team member
         const { data: teamData } = await supabase
           .from("teams")
           .select("id, name")
           .eq("id", profileData.team_id)
           .single();
         setTeam(teamData);
+      } else {
+        // Check if user is a team leader
+        const { data: leaderTeamData } = await supabase
+          .from("teams")
+          .select("id, name")
+          .eq("leader_id", user.id)
+          .single();
+        if (leaderTeamData) {
+          setTeam(leaderTeamData);
+        }
       }
 
       // Fetch Shift Info

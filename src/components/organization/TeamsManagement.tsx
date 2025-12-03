@@ -51,6 +51,7 @@ interface User {
   last_name: string | null;
   email: string;
   team_id: string | null;
+  role?: 'leader' | 'staff';
 }
 
 interface TeamMember {
@@ -128,13 +129,29 @@ const TeamsManagement = () => {
 
       const roleMap = new Map((rolesData || []).map(r => [r.user_id, r.role]));
       const validUsers = (profilesData || []).filter((user) => user.id && user.id.trim() !== "");
-      const leaderUsers = validUsers.filter((user) => roleMap.get(user.id) === 'leader');
 
-      setUsers(validUsers);
+      // Enrich users with role information
+      const usersWithRoles = validUsers.map((user) => ({
+        ...user,
+        role: (roleMap.get(user.id) || 'staff') as 'leader' | 'staff'
+      }));
+
+      const leaderUsers = usersWithRoles.filter((user) => user.role === 'leader');
+
+      setUsers(usersWithRoles);
       setLeaders(leaderUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
     }
+  };
+
+  const getFilteredMembersForTeam = () => {
+    return users.filter((user) => {
+      // Only allow staff users without a team
+      const isStaffRole = user.role === 'staff';
+      const hasNoTeam = !user.team_id;
+      return isStaffRole && hasNoTeam;
+    });
   };
 
   const fetchTeamMembers = async (teamId: string) => {
@@ -542,35 +559,57 @@ const TeamsManagement = () => {
           <DialogHeader>
             <DialogTitle>Manage Team Members - {selectedTeam?.name}</DialogTitle>
             <DialogDescription>
-              Select members to add or remove from this team
+              Select members to add or remove from this team. Only staff without a team can be added.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-80 overflow-y-auto">
-            {users.map((user) => (
-              <div key={user.id} className="flex items-center gap-3 p-3 rounded border">
+            {selectedTeam && teamMembers.map((member) => (
+              <div key={member.id} className="flex items-center gap-3 p-3 rounded border">
                 <Checkbox
-                  checked={selectedMemberIds.has(user.id)}
+                  checked={selectedMemberIds.has(member.id)}
                   onCheckedChange={(checked) => {
                     const newIds = new Set(selectedMemberIds);
                     if (checked) {
-                      newIds.add(user.id);
+                      newIds.add(member.id);
                     } else {
-                      newIds.delete(user.id);
+                      newIds.delete(member.id);
                     }
                     setSelectedMemberIds(newIds);
                   }}
                 />
                 <div className="flex-1">
-                  <p className="font-medium">{getFullName(user.first_name, user.last_name)}</p>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                  <p className="font-medium">{getFullName(member.first_name, member.last_name)}</p>
+                  <p className="text-sm text-muted-foreground">{member.email}</p>
                 </div>
-                {user.team_id && (
-                  <Badge variant="outline">
-                    {teams.find((t) => t.id === user.team_id)?.name || "Other Team"}
-                  </Badge>
-                )}
               </div>
             ))}
+            <div className="pt-4 border-t">
+              <p className="text-sm font-medium mb-3">Add Staff Members</p>
+              {getFilteredMembersForTeam().map((user) => (
+                <div key={user.id} className="flex items-center gap-3 p-3 rounded border bg-secondary/30">
+                  <Checkbox
+                    checked={selectedMemberIds.has(user.id)}
+                    onCheckedChange={(checked) => {
+                      const newIds = new Set(selectedMemberIds);
+                      if (checked) {
+                        newIds.add(user.id);
+                      } else {
+                        newIds.delete(user.id);
+                      }
+                      setSelectedMemberIds(newIds);
+                    }}
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium">{getFullName(user.first_name, user.last_name)}</p>
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                  </div>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Staff</Badge>
+                </div>
+              ))}
+              {getFilteredMembersForTeam().length === 0 && (
+                <p className="text-sm text-muted-foreground py-4">No available staff members to add</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMembersDialogOpen(false)}>
