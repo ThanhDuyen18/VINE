@@ -404,7 +404,7 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
               <TableHead>End Date</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Submitted</TableHead>
-              {(role === 'leader' || role === 'admin') && <TableHead>Actions</TableHead>}
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -412,14 +412,45 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
               <TableRow key={leave.id}>
                 {(role === 'leader' || role === 'admin') && (
                   <TableCell>
-                    {leave.profiles ? 
-                      `${leave.profiles.first_name} ${leave.profiles.last_name}` 
+                    {leave.profiles ?
+                      `${leave.profiles.first_name} ${leave.profiles.last_name}`
                       : `User ID: ${leave.user_id?.substring(0, 8)}`}
                   </TableCell>
                 )}
-                <TableCell className="capitalize">{leave.type.replace('_', ' ')}</TableCell>
-                <TableCell>{format(new Date(leave.start_date), 'MMM dd, yyyy')}</TableCell>
-                <TableCell>{format(new Date(leave.end_date), 'MMM dd, yyyy')}</TableCell>
+                <TableCell className="capitalize">
+                  {editingId === leave.id ? (
+                    <Input
+                      type="text"
+                      value={leave.type}
+                      disabled
+                      className="w-full"
+                    />
+                  ) : (
+                    leave.type.replace('_', ' ')
+                  )}
+                </TableCell>
+                <TableCell>
+                  {editingId === leave.id ? (
+                    <Input
+                      type="date"
+                      value={editData?.start_date || ''}
+                      onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                    />
+                  ) : (
+                    format(new Date(leave.start_date), 'MMM dd, yyyy')
+                  )}
+                </TableCell>
+                <TableCell>
+                  {editingId === leave.id ? (
+                    <Input
+                      type="date"
+                      value={editData?.end_date || ''}
+                      onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
+                    />
+                  ) : (
+                    format(new Date(leave.end_date), 'MMM dd, yyyy')
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge
                     variant={
@@ -433,9 +464,51 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
                 <TableCell className="text-muted-foreground">
                   {format(new Date(leave.created_at), 'MMM dd, yyyy')}
                 </TableCell>
-                {(role === 'leader' || role === 'admin') && (
-                  <TableCell>
-                    {leave.status === 'pending' && (
+                <TableCell>
+                  <div className="flex gap-2 flex-wrap">
+                    {role === 'staff' && leave.status === 'pending' && (
+                      <>
+                        {editingId === leave.id ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleEditSave(leave.id)}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditStart(leave)}
+                            >
+                              <Edit2 className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDelete(leave.id)}
+                              disabled={deleting === leave.id}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
+                    {(role === 'leader' || role === 'admin') && leave.status === 'pending' && (
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -452,8 +525,8 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
                         </Button>
                       </div>
                     )}
-                  </TableCell>
-                )}
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
