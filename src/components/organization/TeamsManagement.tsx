@@ -438,12 +438,12 @@ const TeamsManagement = () => {
             </div>
             <div>
               <Label>Team Leader</Label>
-              <Select value={formData.leader_id} onValueChange={(value) => setFormData({ ...formData, leader_id: value })}>
+              <Select value={formData.leader_id || "none"} onValueChange={(value) => setFormData({ ...formData, leader_id: value === "none" ? "" : value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a leader" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No Leader</SelectItem>
+                  <SelectItem value="none">No Leader</SelectItem>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {getFullName(user.first_name, user.last_name)}
@@ -490,12 +490,12 @@ const TeamsManagement = () => {
             </div>
             <div>
               <Label>Team Leader</Label>
-              <Select value={formData.leader_id} onValueChange={(value) => setFormData({ ...formData, leader_id: value })}>
+              <Select value={formData.leader_id || "none"} onValueChange={(value) => setFormData({ ...formData, leader_id: value === "none" ? "" : value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a leader" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No Leader</SelectItem>
+                  <SelectItem value="none">No Leader</SelectItem>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {getFullName(user.first_name, user.last_name)}
