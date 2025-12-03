@@ -137,6 +137,23 @@ const TeamsManagement = () => {
     }
   };
 
+  const getFilteredMembersForTeam = () => {
+    const roleMap = new Map();
+
+    // Fetch role map from users with roles to filter members
+    users.forEach((user) => {
+      const role = users.find(u => u.id === user.id) ? 'user' : 'unknown';
+      roleMap.set(user.id, role);
+    });
+
+    return users.filter((user) => {
+      // Only allow staff users without a team
+      const isStaffRole = !leaders.find((leader) => leader.id === user.id);
+      const hasNoTeam = !user.team_id;
+      return isStaffRole && hasNoTeam;
+    });
+  };
+
   const fetchTeamMembers = async (teamId: string) => {
     try {
       const { data, error } = await supabase
