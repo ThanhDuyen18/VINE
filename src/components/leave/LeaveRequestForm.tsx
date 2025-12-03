@@ -101,11 +101,21 @@ const LeaveRequestForm = () => {
     setLoading(true);
 
     try {
-      // Validate dates
+      // Validate required fields
       if (!startDate || !endDate) {
         toast({
           title: "Error",
           description: "Start date and end date are required",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (!approverId) {
+        toast({
+          title: "Error",
+          description: "Please select an approver",
           variant: "destructive"
         });
         setLoading(false);
@@ -122,8 +132,47 @@ const LeaveRequestForm = () => {
         return;
       }
 
+      // Check leave balance (max 12 requests per year)
+      if (leaveBalance <= 0) {
+        toast({
+          title: "Error",
+          description: "You have reached your maximum leave requests for this year (12 times)",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
       const user = await getCurrentUser();
       if (!user) throw new Error("Not authenticated");
+
+      // Check for duplicate dates - can't have overlapping leave requests
+      const { data: existingRequests, error: checkError } = await supabase
+        .from('leave_requests')
+        .select('start_date, end_date, status')
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'approved']);
+
+      if (checkError) throw checkError;
+
+      const newStart = new Date(startDate).getTime();
+      const newEnd = new Date(endDate).getTime();
+
+      const hasConflict = existingRequests?.some(req => {
+        const existingStart = new Date(req.start_date).getTime();
+        const existingEnd = new Date(req.end_date).getTime();
+        return !(newEnd < existingStart || newStart > existingEnd);
+      });
+
+      if (hasConflict) {
+        toast({
+          title: "Error",
+          description: "You already have a leave request for this date range",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
 
       // Determine if it's a standard or custom type
       const isStandardType = STANDARD_LEAVE_TYPES.some(t => t.value === type);
@@ -135,10 +184,20 @@ const LeaveRequestForm = () => {
         start_date: startDate,
         end_date: endDate,
         reason: reason || null,
-        status: 'pending'
+        status: 'pending',
+        approved_by: approverId
       }]);
 
       if (error) throw error;
+
+      // Create notification for approver
+      await supabase.from('notifications').insert([{
+        user_id: approverId,
+        type: 'leave_request',
+        title: 'New Leave Request',
+        message: `${currentUserId} has requested leave from ${startDate} to ${endDate}`,
+        link: '/leave'
+      }]).catch(err => console.log('Notification creation skipped:', err));
 
       toast({
         title: "Success",
