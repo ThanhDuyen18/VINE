@@ -166,7 +166,11 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
 
       const { data, error } = await supabase
         .from('tasks')
-        .select('*')
+        .select(`
+          *,
+          assignee:assignee_id(id, first_name, last_name, avatar_url),
+          creator:creator_id(id, first_name, last_name, avatar_url)
+        `)
         .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
