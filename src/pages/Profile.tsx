@@ -45,6 +45,10 @@ interface UserProfile {
   last_online: string | null;
 }
 
+interface UserRole {
+  role: 'admin' | 'leader' | 'staff';
+}
+
 interface Team {
   id: string;
   name: string;
@@ -65,6 +69,7 @@ export default function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [shift, setShift] = useState<Shift | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   // State cho Signed URL của CV (để hiển thị link tải về bảo mật)
   const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
 
@@ -117,6 +122,19 @@ export default function Profile() {
         phone: profileData.phone || "",
         date_of_birth: profileData.date_of_birth || "",
       });
+
+      // Fetch User Role
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      if (roleError) {
+        setUserRole({ role: 'staff' });
+      } else {
+        setUserRole(roleData as unknown as UserRole);
+      }
 
       // Xử lý Signed URL cho CV (nếu có cv_url)
       if (profileData && profileData.cv_url) {
@@ -428,6 +446,47 @@ export default function Profile() {
                 <p className="text-sm text-muted-foreground mt-2">
                   JPG, PNG or GIF. Max size 2MB
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Role and Team Info Card */}
+          <Card className="shadow-medium transition-smooth hover:shadow-strong">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Position & Team
+              </CardTitle>
+              <CardDescription>Your current role and team assignment</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label className="text-sm font-medium">Position</Label>
+                  <div className="mt-2">
+                    {userRole ? (
+                      <div className="inline-flex items-center gap-2 px-3 py-2 bg-primary/10 text-primary rounded-md">
+                        <Briefcase className="h-4 w-4" />
+                        <span className="font-medium capitalize">{userRole.role}</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Not assigned</p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Team</Label>
+                  <div className="mt-2">
+                    {team ? (
+                      <div className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded-md">
+                        <Users className="h-4 w-4" />
+                        <span className="font-medium">{team.name}</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No team assigned</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

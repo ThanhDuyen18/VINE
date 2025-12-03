@@ -6,454 +6,602 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
- Dialog,
- DialogContent,
- DialogDescription,
- DialogHeader,
- DialogTitle,
- DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
- AlertDialog,
- AlertDialogAction,
- AlertDialogCancel,
- AlertDialogContent,
- AlertDialogDescription,
- AlertDialogHeader,
- AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
- Select,
- SelectContent,
- SelectItem,
- SelectTrigger,
- SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Plus, Edit2, Trash2, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader2, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
-// --- INTERFACES ---
 interface Team {
- id: string;
- name: string;
- description: string | null;
- leader_id: string | null;
- created_at: string;
- updated_at: string;
+  id: string;
+  name: string;
+  description: string | null;
+  leader_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface User {
- id: string;
- first_name: string | null;
- last_name: string | null;
- email: string;
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  team_id: string | null;
+}
+
+interface TeamMember {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  team_id: string | null;
 }
 
 const TeamsManagement = () => {
- const { toast } = useToast();
- const [teams, setTeams] = useState<Team[]>([]);
- const [users, setUsers] = useState<User[]>([]);
- const [loading, setLoading] = useState(true);
- const [createOpen, setCreateOpen] = useState(false);
- const [editOpen, setEditOpen] = useState(false);
- const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
- const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
- const [formData, setFormData] = useState({
-  name: "",
-  description: "",
-  leader_id: "",
- });
- const [submitting, setSubmitting] = useState(false);
-
- useEffect(() => {
-  fetchTeams();
-  fetchUsers();
- }, []);
-
-// --- FETCH DATA ---
- const fetchTeams = async () => {
-  try {
-   const { data, error } = await supabase
-    .from('teams')
-    .select('*')
-    .order('name');
-
-   if (error) throw error;
-   setTeams(data || []);
-  } catch (error) {
-   console.error('Error fetching teams:', error);
-   toast({
-    title: "Error",
-    description: "Failed to load teams",
-    variant: "destructive"
-   });
-  } finally {
-   setLoading(false);
-  }
- };
-
- const fetchUsers = async () => {
-  try {
-   const { data, error } = await supabase
-    .from('profiles')
-    .select('id, first_name, last_name, email')
-    .order('first_name');
-
-   if (error) {
-    console.warn('Possible RLS/Permission error when fetching users for Select dropdown:', error);
-   }
-   
-   // Lọc bỏ mọi user có ID là null/undefined hoặc chuỗi rỗng để tránh lỗi Radix UI Select.Item
-   const validUsers = (data || []).filter(user => user.id && user.id.trim() !== "");
-   setUsers(validUsers);
-  } catch (error) {
-   console.error('Error fetching users:', error);
-  }
- };
-
-// --- HANDLERS ---
- const handleOpenCreate = () => {
-  setFormData({ name: "", description: "", leader_id: "" });
-  setCreateOpen(true);
- };
-
- const handleOpenEdit = (team: Team) => {
-  setSelectedTeam(team);
-  setFormData({
-   name: team.name,
-   description: team.description || "",
-   leader_id: team.leader_id || "",
+  const { toast } = useToast();
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [leaders, setLeaders] = useState<User[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    leader_id: "",
   });
-  setEditOpen(true);
- };
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
 
- const handleCreate = async () => {
-  if (!formData.name.trim()) {
-   toast({
-    title: "Error",
-    description: "Team name is required",
-    variant: "destructive"
-   });
-   return;
+  useEffect(() => {
+    fetchTeams();
+    fetchUsers();
+  }, []);
+
+  const fetchTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("*")
+        .order("name");
+
+      if (error) throw error;
+      setTeams(data || []);
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load teams",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, team_id")
+        .order("first_name");
+
+      if (profilesError) {
+        console.warn("Error fetching users:", profilesError);
+      }
+
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id, role");
+
+      if (rolesError) {
+        console.warn("Error fetching user roles:", rolesError);
+      }
+
+      const roleMap = new Map((rolesData || []).map(r => [r.user_id, r.role]));
+      const validUsers = (profilesData || []).filter((user) => user.id && user.id.trim() !== "");
+      const leaderUsers = validUsers.filter((user) => roleMap.get(user.id) === 'leader');
+
+      setUsers(validUsers);
+      setLeaders(leaderUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
+
+  const fetchTeamMembers = async (teamId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, team_id")
+        .eq("team_id", teamId)
+        .order("first_name");
+
+      if (error) throw error;
+
+      setTeamMembers(data || []);
+      setSelectedMemberIds(new Set((data || []).map((m) => m.id)));
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load team members",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOpenCreate = () => {
+    setFormData({ name: "", description: "", leader_id: "" });
+    setCreateOpen(true);
+  };
+
+  const handleOpenEdit = (team: Team) => {
+    setSelectedTeam(team);
+    setFormData({
+      name: team.name,
+      description: team.description || "",
+      leader_id: team.leader_id || "",
+    });
+    setEditOpen(true);
+  };
+
+  const handleOpenMembers = (team: Team) => {
+    setSelectedTeam(team);
+    fetchTeamMembers(team.id);
+    setMembersDialogOpen(true);
+  };
+
+  const handleCreate = async () => {
+    if (!formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Team name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from("teams").insert([
+        {
+          name: formData.name,
+          description: formData.description || null,
+          leader_id: formData.leader_id || null,
+        },
+      ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Team created successfully",
+      });
+
+      setCreateOpen(false);
+      fetchTeams();
+    } catch (error) {
+      console.error("Error creating team:", error);
+      toast({
+        title: "Error",
+        description: `Failed to create team: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedTeam || !formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Team name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("teams")
+        .update({
+          name: formData.name,
+          description: formData.description || null,
+          leader_id: formData.leader_id || null,
+        })
+        .eq("id", selectedTeam.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Team updated successfully",
+      });
+
+      setEditOpen(false);
+      fetchTeams();
+    } catch (error) {
+      console.error("Error updating team:", error);
+      toast({
+        title: "Error",
+        description: `Failed to update team: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedTeam) return;
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("teams")
+        .delete()
+        .eq("id", selectedTeam.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Team deleted successfully",
+      });
+
+      setDeleteConfirmOpen(false);
+      setSelectedTeam(null);
+      fetchTeams();
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      toast({
+        title: "Error",
+        description: `Failed to delete team: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveMembers = async () => {
+    if (!selectedTeam) return;
+
+    setSubmitting(true);
+    try {
+      const currentMembers = new Set(teamMembers.map((m) => m.id));
+      const membersToAdd = Array.from(selectedMemberIds).filter((id) => !currentMembers.has(id));
+      const membersToRemove = Array.from(currentMembers).filter((id) => !selectedMemberIds.has(id));
+
+      for (const userId of membersToAdd) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ team_id: selectedTeam.id })
+          .eq("id", userId);
+        if (error) throw error;
+      }
+
+      for (const userId of membersToRemove) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ team_id: null })
+          .eq("id", userId);
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: "Team members updated successfully",
+      });
+
+      setMembersDialogOpen(false);
+      fetchUsers();
+    } catch (error) {
+      console.error("Error saving team members:", error);
+      toast({
+        title: "Error",
+        description: `Failed to save team members: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getLeaderName = (leaderId: string | null) => {
+    if (!leaderId) return "-";
+    const leader = users.find((u) => u.id === leaderId);
+    return leader ? `${leader.first_name} ${leader.last_name}` : "-";
+  };
+
+  const getMemberCount = (teamId: string) => {
+    return users.filter((u) => u.team_id === teamId).length;
+  };
+
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(" ") || "N/A";
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-10 bg-muted rounded w-32 animate-pulse" />
+        <div className="h-48 bg-muted rounded animate-pulse" />
+      </div>
+    );
   }
 
-  setSubmitting(true);
-  try {
-   const { error } = await supabase.from('teams').insert([{
-    name: formData.name,
-    description: formData.description || null,
-    leader_id: formData.leader_id || null,
-   }]);
-
-   if (error) throw error;
-
-   toast({
-    title: "Success",
-    description: "Team created successfully"
-   });
-   
-   setCreateOpen(false);
-   fetchTeams();
-  } catch (error) {
-   console.error('Error creating team:', error);
-   toast({
-    title: "Error",
-    description: `Failed to create team: ${error.message || 'Check RLS/Permissions'}`,
-    variant: "destructive"
-   });
-  } finally {
-   setSubmitting(false);
-  }
- };
-
- const handleUpdate = async () => {
-  if (!selectedTeam || !formData.name.trim()) {
-   toast({
-    title: "Error",
-    description: "Team name is required",
-    variant: "destructive"
-   });
-   return;
-  }
-
-  setSubmitting(true);
-  try {
-   const { error } = await supabase
-    .from('teams')
-    .update({
-     name: formData.name,
-     description: formData.description || null,
-     leader_id: formData.leader_id || null,
-    })
-    .eq('id', selectedTeam.id);
-
-   if (error) throw error;
-
-   toast({
-    title: "Success",
-    description: "Team updated successfully"
-   });
-   
-   setEditOpen(false);
-   fetchTeams();
-  } catch (error) {
-   console.error('Error updating team:', error);
-   toast({
-    title: "Error",
-    description: `Failed to update team: ${error.message || 'Check RLS/Permissions'}`,
-    variant: "destructive"
-   });
-  } finally {
-   setSubmitting(false);
-  }
- };
-
- const handleDelete = async () => {
-  if (!selectedTeam) return;
-
-  setSubmitting(true);
-  try {
-   const { error } = await supabase
-    .from('teams')
-    .delete()
-    .eq('id', selectedTeam.id);
-
-   if (error) throw error;
-
-   toast({
-    title: "Success",
-    description: "Team deleted successfully"
-   });
-   
-   setDeleteConfirmOpen(false);
-   setSelectedTeam(null);
-   fetchTeams();
-  } catch (error) {
-   console.error('Error deleting team:', error);
-   toast({
-    title: "Error",
-    description: `Failed to delete team: ${error.message || 'Check RLS/Permissions'}`,
-    variant: "destructive"
-   });
-  } finally {
-   setSubmitting(false);
-  }
- };
-
- const getLeaderName = (leaderId: string | null) => {
-  if (!leaderId) return '-';
-  const leader = users.find(u => u.id === leaderId);
-  return leader ? `${leader.first_name} ${leader.last_name}` : '-';
- };
-
- const getMemberCount = async (teamId: string) => {
-  const { count } = await supabase
-   .from('profiles')
-   .select('*', { count: 'exact', head: true })
-   .eq('team_id', teamId);
-  return count || 0;
- };
-
-// --- RENDER ---
- if (loading) {
   return (
-   <div className="flex items-center justify-center py-8">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    <p className="ml-2">Loading teams and users...</p>
-   </div>
-  );
- }
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">Teams</h3>
+        <Button onClick={handleOpenCreate} className="gap-2">
+          <Plus className="h-4 w-4" />
+          New Team
+        </Button>
+      </div>
 
- return (
-  <div className="space-y-4">
-   <div className="flex justify-end">
-    <Button onClick={handleOpenCreate}>
-     <Plus className="h-4 w-4 mr-2" />
-     Add Team
-    </Button>
-   </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Team Name</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Leader</TableHead>
+              <TableHead className="text-center">Members</TableHead>
+              <TableHead className="w-32">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {teams.map((team) => (
+              <TableRow key={team.id}>
+                <TableCell className="font-medium">{team.name}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {team.description || "-"}
+                </TableCell>
+                <TableCell>{getLeaderName(team.leader_id)}</TableCell>
+                <TableCell className="text-center">
+                  <Badge variant="secondary">{getMemberCount(team.id)}</Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenMembers(team)}
+                      className="gap-1"
+                    >
+                      <Users className="h-3 w-3" />
+                      Members
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleOpenEdit(team)}>
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedTeam(team);
+                        setDeleteConfirmOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
 
-   {teams.length === 0 ? (
-    <Card className="p-8 text-center">
-     <p className="text-muted-foreground">No teams created yet</p>
-    </Card>
-   ) : (
-    <div className="border rounded-lg overflow-hidden">
-     <Table>
-      <TableHeader>
-       <TableRow>
-        <TableHead>Team Name</TableHead>
-        <TableHead>Description</TableHead>
-        <TableHead>Leader</TableHead>
-        <TableHead>Created</TableHead>
-        <TableHead className="text-right">Actions</TableHead>
-       </TableRow>
-      </TableHeader>
-      <TableBody>
-       {teams.map((team) => (
-        <TableRow key={team.id}>
-         <TableCell className="font-medium">{team.name}</TableCell>
-         <TableCell className="text-muted-foreground">{team.description || '-'}</TableCell>
-         <TableCell>{getLeaderName(team.leader_id)}</TableCell>
-         <TableCell className="text-muted-foreground">
-          {format(new Date(team.created_at), 'MMM dd, yyyy')}
-         </TableCell>
-         <TableCell className="text-right space-x-2">
-          <Button
-           variant="ghost"
-           size="sm"
-           onClick={() => handleOpenEdit(team)}
-          >
-           <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button
-           variant="ghost"
-           size="sm"
-           onClick={() => {
-            setSelectedTeam(team);
-            setDeleteConfirmOpen(true);
-           }}
-          >
-           <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-         </TableCell>
-        </TableRow>
-       ))}
-      </TableBody>
-     </Table>
+      {/* Create Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Team</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Team Name</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Enter team name"
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Enter team description (optional)"
+              />
+            </div>
+            <div>
+              <Label>Team Leader</Label>
+              <Select value={formData.leader_id || "none"} onValueChange={(value) => setFormData({ ...formData, leader_id: value === "none" ? "" : value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a leader" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Leader</SelectItem>
+                  {leaders.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {getFullName(user.first_name, user.last_name)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {leaders.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-2">No leaders available. Promote staff to leader role first.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={submitting}>
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Team</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Team Name</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Enter team name"
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Enter team description (optional)"
+              />
+            </div>
+            <div>
+              <Label>Team Leader</Label>
+              <Select value={formData.leader_id || "none"} onValueChange={(value) => setFormData({ ...formData, leader_id: value === "none" ? "" : value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a leader" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Leader</SelectItem>
+                  {leaders.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {getFullName(user.first_name, user.last_name)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {leaders.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-2">No leaders available. Promote staff to leader role first.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} disabled={submitting}>
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Update
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Members Management Dialog */}
+      <Dialog open={membersDialogOpen} onOpenChange={setMembersDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-96">
+          <DialogHeader>
+            <DialogTitle>Manage Team Members - {selectedTeam?.name}</DialogTitle>
+            <DialogDescription>
+              Select members to add or remove from this team
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 max-h-80 overflow-y-auto">
+            {users.map((user) => (
+              <div key={user.id} className="flex items-center gap-3 p-3 rounded border">
+                <Checkbox
+                  checked={selectedMemberIds.has(user.id)}
+                  onCheckedChange={(checked) => {
+                    const newIds = new Set(selectedMemberIds);
+                    if (checked) {
+                      newIds.add(user.id);
+                    } else {
+                      newIds.delete(user.id);
+                    }
+                    setSelectedMemberIds(newIds);
+                  }}
+                />
+                <div className="flex-1">
+                  <p className="font-medium">{getFullName(user.first_name, user.last_name)}</p>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                </div>
+                {user.team_id && (
+                  <Badge variant="outline">
+                    {teams.find((t) => t.id === user.team_id)?.name || "Other Team"}
+                  </Badge>
+                )}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMembersDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveMembers} disabled={submitting}>
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Members
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Team?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedTeam?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogAction onClick={handleDelete} disabled={submitting}>
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Delete
+          </AlertDialogAction>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-   )}
-
-   {/* DIALOG TẠO TEAM (CREATE) - ĐÃ SỬA LỖI JSX VÀ SELECT.ITEM */}
-   <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-    <DialogContent>
-     <DialogHeader>
-      <DialogTitle>Create New Team</DialogTitle>
-      <DialogDescription>Add a new team to your organization</DialogDescription>
-     </DialogHeader>
-     <div className="space-y-4">
-      <div>
-       <Label htmlFor="name">Team Name *</Label>
-       <Input
-        id="name"
-        value={formData.name}
-        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-        placeholder="Engineering"
-       />
-      </div>
-      <div>
-       <Label htmlFor="description">Description</Label>
-       <Textarea
-        id="description"
-        value={formData.description}
-        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-        placeholder="Team description (optional)"
-        rows={3}
-       />
-      </div>
-      <div>
-       <Label htmlFor="leader">Team Leader</Label>
-       <Select value={formData.leader_id} onValueChange={(value) => setFormData({ ...formData, leader_id: value })}>
-        <SelectTrigger>
-         <SelectValue placeholder="Select a team leader" />
-        </SelectTrigger>
-        <SelectContent>
-         {users
-          .filter(user => user.id && user.id.trim() !== "")
-          .map(user => (
-          <SelectItem key={user.id} value={user.id}>
-           {user.first_name} {user.last_name} ({user.email})
-          </SelectItem>
-         ))}
-        </SelectContent>
-       </Select>
-      </div>
-     </div>
-     <DialogFooter>
-      <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-      <Button onClick={handleCreate} disabled={submitting}>
-       {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-       Create Team
-      </Button>
-     </DialogFooter>
-    </DialogContent>
-   </Dialog>
-
-   {/* DIALOG CHỈNH SỬA TEAM (EDIT) */}
-   <Dialog open={editOpen} onOpenChange={setEditOpen}>
-    <DialogContent>
-     <DialogHeader>
-      <DialogTitle>Edit Team</DialogTitle>
-      <DialogDescription>Update team information</DialogDescription>
-     </DialogHeader>
-     <div className="space-y-4">
-      <div>
-       <Label htmlFor="edit-name">Team Name *</Label>
-       <Input
-        id="edit-name"
-        value={formData.name}
-        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-        placeholder="Engineering"
-       />
-      </div>
-      <div>
-       <Label htmlFor="edit-description">Description</Label>
-       <Textarea
-        id="edit-description"
-        value={formData.description}
-        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-        placeholder="Team description (optional)"
-        rows={3}
-       />
-      </div>
-      <div>
-       <Label htmlFor="edit-leader">Team Leader</Label>
-       <Select value={formData.leader_id} onValueChange={(value) => setFormData({ ...formData, leader_id: value })}>
-        <SelectTrigger>
-         <SelectValue placeholder="Select a team leader" />
-        </SelectTrigger>
-        <SelectContent>
-         {users
-          .filter(user => user.id && user.id.trim() !== "")
-          .map(user => (
-          <SelectItem key={user.id} value={user.id}>
-           {user.first_name} {user.last_name} ({user.email})
-          </SelectItem>
-         ))}
-        </SelectContent>
-       </Select>
-      </div>
-     </div>
-     <DialogFooter>
-      <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-      <Button onClick={handleUpdate} disabled={submitting}>
-       {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-       Update Team
-      </Button>
-     </DialogFooter>
-    </DialogContent>
-   </Dialog>
-
-   {/* ALERT DIALOG XÓA TEAM */}
-   <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-    <AlertDialogContent>
-     <AlertDialogHeader>
-      <AlertDialogTitle>Delete Team</AlertDialogTitle>
-      <AlertDialogDescription>
-       Are you sure you want to delete "{selectedTeam?.name}"? This action cannot be undone.
-      </AlertDialogDescription>
-     </AlertDialogHeader>
-     <AlertDialogCancel>Cancel</AlertDialogCancel>
-     <AlertDialogAction onClick={handleDelete} disabled={submitting}>
-      {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      Delete
-     </AlertDialogAction>
-    </AlertDialogContent>
-   </AlertDialog>
-  </div>
- );
+  );
 };
 
 export default TeamsManagement;
