@@ -153,19 +153,22 @@ const BookingCalendar = ({ role }: { role: UserRole }) => {
             const endTime = new Date(booking.end_time).getTime();
             const now = new Date().getTime();
             const isPast = endTime < now;
+            const isOrganizer = currentUser && currentUser.id === booking.user_id;
 
             return (
               <Card
                 key={booking.id}
-                className="cursor-pointer hover:bg-secondary/50 transition-colors"
-                onClick={() => {
-                  setSelectedBooking(booking);
-                  setDetailsDialogOpen(true);
-                }}
+                className="hover:bg-secondary/50 transition-colors"
               >
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    <span>{booking.title}</span>
+                    <span
+                      className="cursor-pointer flex-1"
+                      onClick={() => {
+                        setSelectedBooking(booking);
+                        setDetailsDialogOpen(true);
+                      }}
+                    >{booking.title}</span>
                     <div className="flex gap-2">
                       <Badge
                         variant={
@@ -220,6 +223,32 @@ const BookingCalendar = ({ role }: { role: UserRole }) => {
                           {attendeeCount} attendee{attendeeCount !== 1 ? 's' : ''}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {isOrganizer && booking.status !== 'cancelled' && (
+                    <div className="flex gap-2 pt-2 border-t">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedBooking(booking);
+                          setEditDialogOpen(true);
+                        }}
+                        className="flex-1"
+                      >
+                        <Edit2 className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteBooking(booking.id)}
+                        className="flex-1"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
                     </div>
                   )}
                 </CardContent>
