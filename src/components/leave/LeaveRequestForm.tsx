@@ -53,21 +53,29 @@ const LeaveRequestForm = () => {
       setCustomLeaveTypes(typesData || []);
 
       // Load approvers (all users with leader role)
-      const { data: leaderRoles, error: leaderError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'leader');
+      try {
+        const { data: leaderRoles, error: leaderError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'leader');
 
-      if (leaderRoles && leaderRoles.length > 0) {
-        const leaderIds = leaderRoles.map(r => r.user_id);
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .in('id', leaderIds);
+        if (leaderError) throw leaderError;
 
-        if (profilesData) {
-          setApprovers(profilesData);
+        if (leaderRoles && leaderRoles.length > 0) {
+          const leaderIds = leaderRoles.map(r => r.user_id);
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', leaderIds);
+
+          if (profilesError) throw profilesError;
+          if (profilesData) {
+            setApprovers(profilesData);
+          }
         }
+      } catch (err) {
+        console.error('Error loading approvers:', err);
+        // Continue even if approvers fail to load
       }
 
       // Load shifts
@@ -82,13 +90,15 @@ const LeaveRequestForm = () => {
       // Load leave balance
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('annual_leave_balance, leave_request_count')
+        .select('annual_leave_balance')
         .eq('id', user.id)
         .single();
 
-      if (profileError) throw profileError;
-      if (profileData) {
-        setLeaveBalance((profileData.annual_leave_balance || 12) - (profileData.leave_request_count || 0));
+      if (profileError) {
+        // Set default balance if profile fetch fails
+        setLeaveBalance(12);
+      } else if (profileData) {
+        setLeaveBalance(profileData.annual_leave_balance || 12);
       }
     } catch (error) {
       console.error('Error loading data:', error);
