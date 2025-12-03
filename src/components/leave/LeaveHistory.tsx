@@ -299,8 +299,25 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
 
     const matchMonth = !filterMonth || leaveMonth === filterMonth;
     const matchYear = !filterYear || leaveYear === filterYear;
+    const matchStatus = !filterStatus || leave.status === filterStatus;
 
-    return matchMonth && matchYear;
+    let matchDateRange = true;
+    if (filterStartDate || filterEndDate) {
+      const leaveStartTime = new Date(leave.start_date).getTime();
+      const leaveEndTime = new Date(leave.end_date).getTime();
+
+      if (filterStartDate) {
+        const filterStart = new Date(filterStartDate).getTime();
+        matchDateRange = matchDateRange && leaveEndTime >= filterStart;
+      }
+
+      if (filterEndDate) {
+        const filterEnd = new Date(filterEndDate).getTime();
+        matchDateRange = matchDateRange && leaveStartTime <= filterEnd;
+      }
+    }
+
+    return matchMonth && matchYear && matchStatus && matchDateRange;
   });
 
   return (
