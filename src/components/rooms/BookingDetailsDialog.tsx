@@ -106,6 +106,27 @@ const BookingDetailsDialog = ({ booking, open, onOpenChange, onJoinLeave }: Book
     }
   };
 
+  const handleCancelBooking = async () => {
+    setIsCancelling(true);
+    try {
+      const { error } = await supabase
+        .from('room_bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', booking.id);
+
+      if (error) throw error;
+
+      toast.success("Booking cancelled successfully");
+      onJoinLeave?.();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      toast.error("Failed to cancel booking");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const getInitials = (firstName?: string, lastName?: string) => {
     return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
   };
