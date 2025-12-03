@@ -129,9 +129,16 @@ const TeamsManagement = () => {
 
       const roleMap = new Map((rolesData || []).map(r => [r.user_id, r.role]));
       const validUsers = (profilesData || []).filter((user) => user.id && user.id.trim() !== "");
-      const leaderUsers = validUsers.filter((user) => roleMap.get(user.id) === 'leader');
 
-      setUsers(validUsers);
+      // Enrich users with role information
+      const usersWithRoles = validUsers.map((user) => ({
+        ...user,
+        role: (roleMap.get(user.id) || 'staff') as 'leader' | 'staff'
+      }));
+
+      const leaderUsers = usersWithRoles.filter((user) => user.role === 'leader');
+
+      setUsers(usersWithRoles);
       setLeaders(leaderUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -139,17 +146,9 @@ const TeamsManagement = () => {
   };
 
   const getFilteredMembersForTeam = () => {
-    const roleMap = new Map();
-
-    // Fetch role map from users with roles to filter members
-    users.forEach((user) => {
-      const role = users.find(u => u.id === user.id) ? 'user' : 'unknown';
-      roleMap.set(user.id, role);
-    });
-
     return users.filter((user) => {
       // Only allow staff users without a team
-      const isStaffRole = !leaders.find((leader) => leader.id === user.id);
+      const isStaffRole = user.role === 'staff';
       const hasNoTeam = !user.team_id;
       return isStaffRole && hasNoTeam;
     });
