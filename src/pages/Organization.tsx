@@ -46,17 +46,23 @@ const Organization = () => {
         <Tabs defaultValue="users" className="w-full">
           <TabsList className="bg-secondary shadow-soft">
             <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Users & Approval</TabsTrigger>
+            <TabsTrigger value="teams" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Teams</TabsTrigger>
+            <TabsTrigger value="shifts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Shifts</TabsTrigger>
             <TabsTrigger value="roles" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Role Management</TabsTrigger>
-            
             <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Attendance</TabsTrigger>
           </TabsList>
           <TabsContent value="users" className="mt-6">
             <UsersManagement />
           </TabsContent>
+          <TabsContent value="teams" className="mt-6">
+            <TeamsManagement />
+          </TabsContent>
+          <TabsContent value="shifts" className="mt-6">
+            <ShiftsManagement />
+          </TabsContent>
           <TabsContent value="roles" className="mt-6">
             <RoleManagement />
           </TabsContent>
-          
           <TabsContent value="settings" className="mt-6">
             <AttendanceSettings />
           </TabsContent>
