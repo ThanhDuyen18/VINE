@@ -45,6 +45,10 @@ interface UserProfile {
   last_online: string | null;
 }
 
+interface UserRole {
+  role: 'admin' | 'leader' | 'staff';
+}
+
 interface Team {
   id: string;
   name: string;
