@@ -58,7 +58,7 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
 
       setLeaves(data as unknown as LeaveRequest[] || []);
     } catch (error) {
-      console.error('Error fetching leaves:', error);
+      console.error('Error fetching leaves:', error instanceof Error ? error.message : JSON.stringify(error));
     } finally {
       setLoading(false);
     }
