@@ -259,23 +259,23 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
-              <button className="group p-6 rounded-lg border-2 border-border hover:border-primary transition-smooth text-left hover:shadow-medium bg-gradient-to-br from-card to-secondary/30">
+              <button onClick={() => navigate('/attendance')} className="group p-6 rounded-lg border-2 border-border hover:border-primary transition-smooth text-left hover:shadow-medium bg-gradient-to-br from-card to-secondary/30">
                 <div className="p-3 bg-primary/10 rounded-lg w-fit group-hover:bg-primary/20 transition-smooth">
                   <Clock className="h-6 w-6 text-primary" />
                 </div>
                 <h4 className="font-semibold mt-4 mb-1">Check In/Out</h4>
                 <p className="text-sm text-muted-foreground">Record attendance</p>
               </button>
-              
-              <button className="group p-6 rounded-lg border-2 border-border hover:border-primary transition-smooth text-left hover:shadow-medium bg-gradient-to-br from-card to-secondary/30">
+
+              <button onClick={() => navigate('/tasks')} className="group p-6 rounded-lg border-2 border-border hover:border-primary transition-smooth text-left hover:shadow-medium bg-gradient-to-br from-card to-secondary/30">
                 <div className="p-3 bg-primary/10 rounded-lg w-fit group-hover:bg-primary/20 transition-smooth">
                   <FileText className="h-6 w-6 text-primary" />
                 </div>
                 <h4 className="font-semibold mt-4 mb-1">Create Task</h4>
                 <p className="text-sm text-muted-foreground">Add new task</p>
               </button>
-              
-              <button className="group p-6 rounded-lg border-2 border-border hover:border-primary transition-smooth text-left hover:shadow-medium bg-gradient-to-br from-card to-secondary/30">
+
+              <button onClick={() => navigate('/meeting-rooms')} className="group p-6 rounded-lg border-2 border-border hover:border-primary transition-smooth text-left hover:shadow-medium bg-gradient-to-br from-card to-secondary/30">
                 <div className="p-3 bg-primary/10 rounded-lg w-fit group-hover:bg-primary/20 transition-smooth">
                   <Calendar className="h-6 w-6 text-primary" />
                 </div>
