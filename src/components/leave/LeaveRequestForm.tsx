@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getUserRole } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 
 const STANDARD_LEAVE_TYPES = [
@@ -20,10 +20,16 @@ const LeaveRequestForm = () => {
   const [type, setType] = useState("annual");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [shiftId, setShiftId] = useState("");
   const [reason, setReason] = useState("");
+  const [approverId, setApproverId] = useState("");
   const [loading, setLoading] = useState(false);
   const [customLeaveTypes, setCustomLeaveTypes] = useState<any[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
+  const [approvers, setApprovers] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [leaveBalance, setLeaveBalance] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
