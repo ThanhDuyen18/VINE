@@ -749,10 +749,245 @@ ALTER FUNCTION public.has_role(uuid, app_role) SET search_path TO public, auth, 
 -- ✓ Default shifts (AM/PM) initialized
 -- ✓ Storage policies for file uploads
 --
--- Next steps:
--- 1. Create storage buckets: "avatars" and "documents"
--- 2. CREATE AND DEPLOY THE EDGE FUNCTION for secure user deletion.
--- 3. Set up storage policies for avatars and documents
--- 4. Test all RLS policies thoroughly
--- 5. Monitor database activity for any suspicious patterns
--- 6. Verify default shifts were created with: SELECT * FROM public.shifts;
+-- ========================================================
+-- 13) STORAGE BUCKETS SETUP (MANUAL - VIA SUPABASE DASHBOARD)
+-- ========================================================
+--
+-- IMPORTANT: Storage buckets cannot be created via SQL.
+-- Follow these steps in Supabase Dashboard:
+--
+-- 1. Go to Supabase Dashboard → Storage
+-- 2. Create Bucket: "avatars"
+--    - Visibility: Public
+--    - File size limit: 5 MB
+-- 3. Create Bucket: "documents"
+--    - Visibility: Private
+--    - File size limit: 20 MB
+--
+-- The RLS storage policies for these buckets are already created above.
+--
+-- ========================================================
+-- 14) EDGE FUNCTION FOR USER DELETION (OPTIONAL)
+-- ========================================================
+--
+-- If you need to securely delete users with admin privileges,
+-- deploy this Edge Function to your Supabase project:
+--
+-- File: supabase/functions/delete-user/index.ts
+--
+-- import { serve } from "https://deno.land/std@0.175.0/http/server.ts"
+-- import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+--
+-- interface DeleteRequest {
+--   userId: string
+-- }
+--
+-- serve(async (req: Request) => {
+--   if (req.method !== "POST") {
+--     return new Response("Method not allowed", { status: 405 })
+--   }
+--
+--   const authHeader = req.headers.get("Authorization")
+--   if (!authHeader) {
+--     return new Response("Missing authorization header", { status: 401 })
+--   }
+--
+--   const supabaseAdmin = createClient(
+--     Deno.env.get("SUPABASE_URL") || "",
+--     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+--   )
+--
+--   const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(
+--     authHeader.replace("Bearer ", "")
+--   )
+--
+--   if (authError || !user) {
+--     return new Response("Unauthorized", { status: 401 })
+--   }
+--
+--   // Check if user is admin
+--   const { data: roleData } = await supabaseAdmin
+--     .from("user_roles")
+--     .select("role")
+--     .eq("user_id", user.id)
+--     .single()
+--
+--   if (roleData?.role !== "admin") {
+--     return new Response("Forbidden: Admin access required", { status: 403 })
+--   }
+--
+--   const body: DeleteRequest = await req.json()
+--   const targetUserId = body.userId
+--
+--   // Delete the user from Auth
+--   const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
+--     targetUserId
+--   )
+--
+--   if (deleteError) {
+--     return new Response(
+--       JSON.stringify({ error: deleteError.message }),
+--       { status: 400 }
+--     )
+--   }
+--
+--   return new Response(
+--     JSON.stringify({ success: true, message: "User deleted successfully" }),
+--     { status: 200, headers: { "Content-Type": "application/json" } }
+--   )
+-- })
+--
+-- Deploy with: supabase functions deploy delete-user
+--
+-- ========================================================
+-- 15) FEATURE STATUS & IMPLEMENTATION NOTES
+-- ========================================================
+--
+-- ✅ FULLY IMPLEMENTED:
+-- - User authentication with email verification
+-- - User approval workflow (is_approved, approval_rejected fields)
+-- - Role management (admin, leader, staff)
+-- - Attendance tracking (check-in/check-out)
+-- - Task management with custom columns and priorities
+-- - Leave requests with custom leave types
+-- - Meeting room bookings with approval workflow
+-- - User profiles with team assignment
+-- - RLS policies for all tables
+-- - Storage for avatars and CV uploads
+--
+-- ⚠️  PARTIALLY IMPLEMENTED:
+-- - Notifications table exists but UI for notification management not yet built
+-- - Audit logging table exists but audit log viewing UI not yet implemented
+-- - Meeting room bookings can be viewed but detailed analytics not yet built
+--
+-- 📋 RECOMMENDED NEXT STEPS:
+-- 1. Create storage buckets "avatars" and "documents" in Supabase Dashboard
+-- 2. (Optional) Deploy the delete-user Edge Function for secure user deletion
+-- 3. Test all authentication flows thoroughly
+-- 4. Verify user approval workflow works end-to-end
+-- 5. Test all RLS policies with different user roles
+-- 6. Run sample queries below to verify data integrity
+--
+-- ========================================================
+-- 16) COMPLETE SETUP CHECKLIST
+-- ========================================================
+--
+-- Follow this checklist to ensure complete setup:
+--
+-- DATABASE SETUP (SQL)
+-- [ ] 1. Run ALL SQL commands from sections 1-9 above in Supabase SQL Editor
+-- [ ] 2. Verify all ENUM types created: app_role, leave_type, leave_status, task_status, task_priority, booking_status, attendance_type
+-- [ ] 3. Verify all tables created (15 tables total):
+--       - teams, shifts, user_roles, profiles, attendance
+--       - task_columns, tasks, task_comments
+--       - meeting_rooms, room_bookings
+--       - leave_types, leave_requests
+--       - notifications, audit_logs
+-- [ ] 4. Verify all functions created: has_role(), get_user_team(), update_updated_at_column(), handle_new_user()
+-- [ ] 5. Verify all triggers created (9 total)
+-- [ ] 6. Verify RLS is enabled on all tables (14 total)
+-- [ ] 7. Verify all RLS policies created
+-- [ ] 8. Verify all indexes created (11 total)
+--
+-- STORAGE SETUP (MANUAL - SUPABASE DASHBOARD)
+-- [ ] 1. Go to Storage section in Supabase Dashboard
+-- [ ] 2. Click "New Bucket" → Create bucket named "avatars"
+--       - Make it Public
+--       - Set file size limit: 5MB
+-- [ ] 3. Click "New Bucket" → Create bucket named "documents"
+--       - Make it Private
+--       - Set file size limit: 20MB
+--
+-- FIRST USER SETUP
+-- [ ] 1. Sign up first user via the application
+-- [ ] 2. Update user role to admin (run SQL):
+--       UPDATE user_roles SET role = 'admin' WHERE user_id = 'FIRST_USER_ID';
+-- [ ] 3. Mark user as approved (run SQL):
+--       UPDATE profiles SET is_approved = true WHERE id = 'FIRST_USER_ID';
+-- [ ] 4. Test login with first user
+--
+-- APPLICATION FEATURES (ALREADY IMPLEMENTED)
+-- ✅ User Registration & Login
+-- ✅ User Approval Workflow
+-- ✅ Role Management (staff ↔ leader)
+-- ✅ Admin Approval Interface
+-- ✅ Attendance Tracking with Admin View
+-- ✅ Task Management with Kanban Board
+-- ✅ Leave Requests with Custom Types
+-- ✅ Meeting Room Bookings
+-- ✅ User Profiles with Teams and Shifts
+-- ✅ All RLS Security Policies
+-- ✅ File Storage (avatars, documents)
+--
+-- ========================================================
+-- 17) VERIFICATION QUERIES
+-- ========================================================
+--
+-- Run these queries to verify your database setup:
+--
+-- Verify default shifts exist:
+-- SELECT id, name, start_time, end_time FROM public.shifts ORDER BY start_time;
+--
+-- Get all users with their roles:
+-- SELECT
+--   p.id,
+--   p.first_name,
+--   p.last_name,
+--   p.email,
+--   ur.role,
+--   p.is_approved,
+--   p.approval_rejected
+-- FROM profiles p
+-- LEFT JOIN user_roles ur ON p.id = ur.user_id
+-- ORDER BY p.created_at DESC;
+--
+-- Get pending users waiting for approval:
+-- SELECT id, first_name, last_name, email, created_at
+-- FROM profiles
+-- WHERE is_approved = false AND approval_rejected = false
+-- ORDER BY created_at ASC;
+--
+-- Get admin users:
+-- SELECT p.id, p.email, p.first_name, p.last_name, ur.role
+-- FROM profiles p
+-- LEFT JOIN user_roles ur ON p.id = ur.user_id
+-- WHERE ur.role = 'admin';
+--
+-- Get all tables row counts:
+-- SELECT
+--   schemaname,
+--   tablename,
+--   n_live_tup as row_count
+-- FROM pg_stat_user_tables
+-- WHERE schemaname = 'public'
+-- ORDER BY n_live_tup DESC;
+--
+-- Check if RLS is enabled on all public tables:
+-- SELECT
+--   tablename,
+--   rowsecurity as rls_enabled
+-- FROM pg_tables
+-- WHERE schemaname = 'public'
+-- ORDER BY tablename;
+--
+-- Get all RLS policies:
+-- SELECT
+--   schemaname,
+--   tablename,
+--   policyname
+-- FROM pg_policies
+-- WHERE schemaname = 'public'
+-- ORDER BY tablename, policyname;
+--
+-- ========================================================
+-- DATABASE IS NOW READY FOR USE
+-- ========================================================
+--
+-- Your Vine HRM database is fully configured!
+-- All tables, functions, triggers, and RLS policies are in place.
+--
+-- IMPORTANT REMAINING STEPS:
+-- 1. Create storage buckets (see section 13 above)
+-- 2. (Optional) Deploy Edge Function for user deletion (see section 14)
+-- 3. Sign up first user and approve them as admin
+-- 4. Start using the application!

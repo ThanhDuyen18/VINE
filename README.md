@@ -28,6 +28,7 @@
 - [Role-Based Access](#-role-based-access)
 - [Getting Started](#-getting-started)
 - [Environment Setup](#-environment-setup)
+- [Documentation](#-documentation)
 - [Development](#-development)
 - [Deployment](#-deployment)
 - [Contributing](#-contributing)
@@ -164,21 +165,26 @@ vine-crm/
 
 ## 🗄️ Database Schema
 
-### **Core Tables**
+### **Complete Schema (15 Tables)**
 
-| Table | Description |
-|-------|-------------|
-| `users` | User profiles (id, email, role, team_id, shift_id, avatar) |
-| `teams` | Departments and teams (id, name, leader_id) |
-| `shifts` | Work shifts (id, name, start_time, end_time) |
-| `attendance` | Check-in/out logs (user_id, timestamp, location, type) |
-| `tasks` | Work items (id, title, assignee_id, creator_id, deadline, status) |
-| `meeting_rooms` | Conference rooms (id, name, location, capacity, equipment) |
-| `room_bookings` | Meeting reservations (room_id, user_id, start_time, end_time, status) |
-| `leave_requests` | Time-off requests (user_id, type, start_date, end_date, status, approver_id) |
-| `audit_logs` | System activity logs (user_id, action, entity, timestamp) |
+| Category | Tables |
+|----------|--------|
+| **Users & Auth** | profiles, user_roles |
+| **Organization** | teams, shifts |
+| **Work Management** | attendance, tasks, task_columns, task_comments |
+| **Leave Management** | leave_requests, leave_types |
+| **Facilities** | meeting_rooms, room_bookings |
+| **System** | notifications, audit_logs |
 
-> All tables implement **Row-Level Security (RLS)** for data protection.
+### **Key Features**
+- ✅ **Row-Level Security (RLS)** on all sensitive tables
+- ✅ **Auto-timestamp updates** via triggers
+- ✅ **Performance indexes** on frequently queried columns
+- ✅ **Role-based access control** (admin, leader, staff)
+- ✅ **User approval workflow** with rejection handling
+- ✅ **Custom enum types** for statuses and priorities
+
+For detailed schema documentation, see [Database Setup Guide](./supabase.setup.md) and [Database Integration Guide](./DATABASE_INTEGRATION_GUIDE.md)
 
 ---
 
@@ -228,10 +234,10 @@ vine-crm/
    VITE_SUPABASE_PROJECT_ID=your_project_id
    ```
 
-4. **Run database migrations**
-   ```bash
-   npx supabase db push
-   ```
+4. **Set up database schema** (see [Database Setup Guide](./supabase.setup.md))
+   - Open Supabase SQL Editor
+   - Copy and run all SQL from `supabase.setup.md`
+   - Create storage buckets (avatars, documents) via Supabase Dashboard
 
 5. **Start development server**
    ```bash
@@ -250,10 +256,12 @@ vine-crm/
 ### **Supabase Configuration**
 
 1. Create a new project on [Supabase](https://supabase.com)
-2. Run migrations from `supabase/migrations/`
-3. Enable Row-Level Security on all tables
-4. Configure authentication providers
-5. Set up storage buckets for avatars and attachments
+2. Follow the [Database Setup Guide](./supabase.setup.md):
+   - Execute SQL schema in Supabase SQL Editor
+   - All RLS policies are automatically configured
+   - Create storage buckets (detailed instructions in setup guide)
+3. Create first admin user via signup and approve them
+4. (Optional) Deploy delete-user Edge Function for admin user management
 
 ### **Development Tools**
 
@@ -270,6 +278,21 @@ npm run format
 # Type check
 npm run type-check
 ```
+
+---
+
+## 📚 Documentation
+
+### **Setup Guides**
+
+- **[Database Setup Guide](./supabase.setup.md)** - Complete SQL schema, storage instructions, and verification queries
+- **[Setup Verification](./SETUP_VERIFICATION.md)** - Verification checklist and feature status matrix
+- **[Database Integration Guide](./DATABASE_INTEGRATION_GUIDE.md)** - Quick reference for common queries and operations
+
+### **Feature Documentation**
+
+- **[Implementation Guide](./IMPLEMENTATION_GUIDE.md)** - Detailed feature documentation and deployment steps
+- **[Review Document](./review.md)** - Architecture and design review
 
 ---
 
