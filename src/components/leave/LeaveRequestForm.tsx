@@ -327,15 +327,11 @@ const LeaveRequestForm = () => {
                 <SelectValue placeholder="Select approver" />
               </SelectTrigger>
               <SelectContent>
-                {approvers.length > 0 ? (
-                  approvers.map(approver => (
-                    <SelectItem key={approver.id} value={approver.id}>
-                      {approver.first_name} {approver.last_name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="p-2 text-sm text-muted-foreground">No approvers available</div>
-                )}
+                {approvers.map(approver => (
+                  <SelectItem key={approver.id} value={approver.id}>
+                    {approver.first_name} {approver.last_name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
