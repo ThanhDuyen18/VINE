@@ -62,6 +62,14 @@ const MyBookings = () => {
     return <div className="text-muted-foreground">Loading your bookings...</div>;
   }
 
+  if (loading) {
+    return <div className="text-muted-foreground">Loading your bookings...</div>;
+  }
+
+  if (bookings.length === 0) {
+    return <div className="text-muted-foreground text-center py-8">No bookings yet</div>;
+  }
+
   return (
     <div className="border rounded-lg">
       <Table>
@@ -72,6 +80,7 @@ const MyBookings = () => {
             <TableHead>Start Time</TableHead>
             <TableHead>End Time</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -85,11 +94,29 @@ const MyBookings = () => {
                 <Badge
                   variant={
                     booking.status === 'approved' ? 'default' :
-                    booking.status === 'rejected' ? 'destructive' : 'secondary'
+                    booking.status === 'rejected' ? 'destructive' :
+                    booking.status === 'cancelled' ? 'outline' : 'secondary'
                   }
                 >
                   {booking.status}
                 </Badge>
+              </TableCell>
+              <TableCell>
+                {booking.status !== 'cancelled' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCancelBooking(booking.id)}
+                    disabled={cancelling === booking.id}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    {cancelling === booking.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <X className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
               </TableCell>
             </TableRow>
           ))}
