@@ -80,7 +80,7 @@ const BookingCalendar = ({ role }: { role: UserRole }) => {
       </div>
 
       <div className="grid gap-4">
-        {bookings.map((booking) => {
+        {bookings.filter(b => b.status !== 'cancelled').map((booking) => {
           const creator = creatorInfo.get(booking.user_id);
           const attendeeCount = (booking.attendees || []).length;
           const endTime = new Date(booking.end_time).getTime();
