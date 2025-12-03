@@ -360,9 +360,8 @@ const TeamsManagement = () => {
          <SelectValue placeholder="Select a team leader" />
         </SelectTrigger>
         <SelectContent>
-         <SelectItem value="">None</SelectItem>
          {users
-          .filter(user => user.id && user.id.trim() !== "") // Giữ bộ lọc để đảm bảo tính an toàn
+          .filter(user => user.id && user.id.trim() !== "")
           .map(user => (
           <SelectItem key={user.id} value={user.id}>
            {user.first_name} {user.last_name} ({user.email})
@@ -416,9 +415,8 @@ const TeamsManagement = () => {
          <SelectValue placeholder="Select a team leader" />
         </SelectTrigger>
         <SelectContent>
-         <SelectItem value="">None</SelectItem>
          {users
-          .filter(user => user.id && user.id.trim() !== "") // Giữ bộ lọc để đảm bảo tính an toàn
+          .filter(user => user.id && user.id.trim() !== "")
           .map(user => (
           <SelectItem key={user.id} value={user.id}>
            {user.first_name} {user.last_name} ({user.email})
