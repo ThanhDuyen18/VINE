@@ -311,15 +311,11 @@ const LeaveRequestForm = () => {
                 <SelectValue placeholder="Select shift (optional)" />
               </SelectTrigger>
               <SelectContent>
-                {shifts.length > 0 ? (
-                  shifts.map(shift => (
-                    <SelectItem key={shift.id} value={shift.id}>
-                      {shift.name} ({shift.start_time} - {shift.end_time})
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="p-2 text-sm text-muted-foreground">No shifts available</div>
-                )}
+                {shifts.map(shift => (
+                  <SelectItem key={shift.id} value={shift.id}>
+                    {shift.name} ({shift.start_time} - {shift.end_time})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
