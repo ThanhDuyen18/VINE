@@ -71,9 +71,43 @@ const BookingCalendar = ({ role }: { role: UserRole }) => {
     return <div className="text-muted-foreground">Loading bookings...</div>;
   }
 
+  const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+  const todayBookings = bookings.filter(b => 
+    b.status !== 'cancelled' && 
+    b.start_time.split('T')[0] === selectedDateStr
+  );
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setSelectedDate(addDays(selectedDate, -1))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="w-32 text-center">
+            <p className="font-semibold">{format(selectedDate, 'EEEE')}</p>
+            <p className="text-sm text-muted-foreground">{format(selectedDate, 'MMM dd, yyyy')}</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setSelectedDate(new Date())}
+            className="ml-2"
+          >
+            Today
+          </Button>
+        </div>
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Booking
@@ -81,85 +115,91 @@ const BookingCalendar = ({ role }: { role: UserRole }) => {
       </div>
 
       <div className="grid gap-4">
-        {bookings.filter(b => b.status !== 'cancelled').map((booking) => {
-          const creator = creatorInfo.get(booking.user_id);
-          const attendeeCount = (booking.attendees || []).length;
-          const endTime = new Date(booking.end_time).getTime();
-          const now = new Date().getTime();
-          const isPast = endTime < now;
+        {todayBookings.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">No bookings for this date</p>
+          </Card>
+        ) : (
+          todayBookings.map((booking) => {
+            const creator = creatorInfo.get(booking.user_id);
+            const attendeeCount = (booking.attendees || []).length;
+            const endTime = new Date(booking.end_time).getTime();
+            const now = new Date().getTime();
+            const isPast = endTime < now;
 
-          return (
-            <Card
-              key={booking.id}
-              className="cursor-pointer hover:bg-secondary/50 transition-colors"
-              onClick={() => {
-                setSelectedBooking(booking);
-                setDetailsDialogOpen(true);
-              }}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{booking.title}</span>
-                  <div className="flex gap-2">
-                    <Badge
-                      variant={
-                        booking.status === 'approved' ? 'default' :
-                        booking.status === 'rejected' ? 'destructive' :
-                        booking.status === 'cancelled' ? 'outline' : 'secondary'
-                      }
-                    >
-                      {booking.status}
-                    </Badge>
-                    {isPast && (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                        Done
+            return (
+              <Card
+                key={booking.id}
+                className="cursor-pointer hover:bg-secondary/50 transition-colors"
+                onClick={() => {
+                  setSelectedBooking(booking);
+                  setDetailsDialogOpen(true);
+                }}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>{booking.title}</span>
+                    <div className="flex gap-2">
+                      <Badge
+                        variant={
+                          booking.status === 'approved' ? 'default' :
+                          booking.status === 'rejected' ? 'destructive' :
+                          booking.status === 'cancelled' ? 'outline' : 'secondary'
+                        }
+                      >
+                        {booking.status}
                       </Badge>
-                    )}
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Start: </span>
-                    <span className="font-medium">
-                      {format(new Date(booking.start_time), 'MMM dd, yyyy HH:mm')}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">End: </span>
-                    <span className="font-medium">
-                      {format(new Date(booking.end_time), 'MMM dd, yyyy HH:mm')}
-                    </span>
-                  </div>
-                </div>
-
-                {booking.description && (
-                  <p className="text-sm text-muted-foreground">{booking.description}</p>
-                )}
-
-                {creator && (
-                  <div className="flex items-center gap-2 pt-2 border-t">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={creator.avatar_url || ""} />
-                      <AvatarFallback>
-                        {`${creator.first_name?.[0] || ''}${creator.last_name?.[0] || ''}`.toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="text-xs text-muted-foreground">
-                      Organized by {creator.first_name} {creator.last_name}
+                      {isPast && (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                          Done
+                        </Badge>
+                      )}
                     </div>
-                    {attendeeCount > 0 && (
-                      <div className="text-xs text-muted-foreground ml-auto">
-                        {attendeeCount} attendee{attendeeCount !== 1 ? 's' : ''}
-                      </div>
-                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Start: </span>
+                      <span className="font-medium">
+                        {format(new Date(booking.start_time), 'HH:mm')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">End: </span>
+                      <span className="font-medium">
+                        {format(new Date(booking.end_time), 'HH:mm')}
+                      </span>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+
+                  {booking.description && (
+                    <p className="text-sm text-muted-foreground">{booking.description}</p>
+                  )}
+
+                  {creator && (
+                    <div className="flex items-center gap-2 pt-2 border-t">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={creator.avatar_url || ""} />
+                        <AvatarFallback>
+                          {`${creator.first_name?.[0] || ''}${creator.last_name?.[0] || ''}`.toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="text-xs text-muted-foreground">
+                        Organized by {creator.first_name} {creator.last_name}
+                      </div>
+                      {attendeeCount > 0 && (
+                        <div className="text-xs text-muted-foreground ml-auto">
+                          {attendeeCount} attendee{attendeeCount !== 1 ? 's' : ''}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
 
       <BookingDetailsDialog
