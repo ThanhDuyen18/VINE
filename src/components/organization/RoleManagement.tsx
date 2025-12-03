@@ -72,11 +72,12 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
 
             const { data: teams, error: teamsError } = await supabase
                 .from('teams')
-                .select('id, name');
+                .select('id, name, leader_id');
 
             if (teamsError) console.warn('Error loading teams:', teamsError);
 
             const teamMap = new Map((teams || []).map(t => [t.id, t.name]));
+            const leaderMap = new Map((teams || []).map(t => [t.leader_id, t.name]));
 
             const usersWithRoles = (profiles || [])
                 .filter(profile => {
@@ -89,6 +90,14 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
                     // Đảm bảo new_role không bao giờ là 'admin'
                     const initialRole = (role === 'admin' ? 'staff' : role) as 'leader' | 'staff';
 
+                    // Check if user is a team member (has team_id) or team leader
+                    let teamName: string | null = null;
+                    if (profile.team_id) {
+                        teamName = teamMap.get(profile.team_id) || null;
+                    } else if (leaderMap.has(profile.id)) {
+                        teamName = leaderMap.get(profile.id) || null;
+                    }
+
                     return ({
                         id: profile.id,
                         first_name: profile.first_name,
@@ -97,7 +106,7 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
                         avatar_url: profile.avatar_url,
                         cv_url: profile.cv_url,
                         team_id: profile.team_id,
-                        team_name: profile.team_id ? teamMap.get(profile.team_id) || null : null,
+                        team_name: teamName,
                         current_role: role,
                         new_role: initialRole,
                         changed: false
