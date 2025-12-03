@@ -57,22 +57,31 @@ const LeaderTeamMembers = () => {
         return;
       }
 
-      const profile = await getUserProfile(user.id);
-      if (!profile?.team_id) {
+      // Find team where user is the leader
+      const { data: teamsData, error: teamsError } = await supabase
+        .from('teams')
+        .select('id, name')
+        .eq('leader_id', user.id);
+
+      if (teamsError) throw teamsError;
+
+      if (!teamsData || teamsData.length === 0) {
         toast({
           title: "Error",
-          description: "You are not assigned to a team",
+          description: "You are not assigned as a team leader",
           variant: "destructive"
         });
         setLoading(false);
         return;
       }
 
-      // Fetch team members
+      const teamId = teamsData[0].id;
+
+      // Fetch team members (staff assigned to this team)
       const { data: membersData, error: membersError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email, phone, team_id, shift_id')
-        .eq('team_id', profile.team_id)
+        .eq('team_id', teamId)
         .order('first_name');
 
       if (membersError) throw membersError;
