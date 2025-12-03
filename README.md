@@ -281,6 +281,21 @@ npm run type-check
 
 ---
 
+## 📚 Documentation
+
+### **Setup Guides**
+
+- **[Database Setup Guide](./supabase.setup.md)** - Complete SQL schema, storage instructions, and verification queries
+- **[Setup Verification](./SETUP_VERIFICATION.md)** - Verification checklist and feature status matrix
+- **[Database Integration Guide](./DATABASE_INTEGRATION_GUIDE.md)** - Quick reference for common queries and operations
+
+### **Feature Documentation**
+
+- **[Implementation Guide](./IMPLEMENTATION_GUIDE.md)** - Detailed feature documentation and deployment steps
+- **[Review Document](./review.md)** - Architecture and design review
+
+---
+
 ## 💻 Development
 
 ### **Running Tests**
