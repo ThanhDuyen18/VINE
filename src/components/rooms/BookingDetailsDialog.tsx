@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUser } from "@/lib/auth";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Users, LogIn, LogOut } from "lucide-react";
+import { Users, LogIn, LogOut, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface BookingDetailsDialogProps {
