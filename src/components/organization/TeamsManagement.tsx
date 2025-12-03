@@ -51,6 +51,7 @@ interface User {
   last_name: string | null;
   email: string;
   team_id: string | null;
+  role?: 'leader' | 'staff';
 }
 
 interface TeamMember {
