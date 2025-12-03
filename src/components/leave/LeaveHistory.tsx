@@ -38,27 +38,44 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
       const user = await getCurrentUser();
       if (!user) return;
 
-      let query = supabase
+      const leaveQuery = supabase
         .from('leave_requests')
-        .select(`
-          *,
-          profiles:user_id (
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (role === 'staff') {
-        query = query.eq('user_id', user.id);
+        leaveQuery.eq('user_id', user.id);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data: leaveData, error: leaveError } = await leaveQuery;
+      if (leaveError) throw leaveError;
 
-      setLeaves(data as unknown as LeaveRequest[] || []);
+      if (!leaveData || leaveData.length === 0) {
+        setLeaves([]);
+        return;
+      }
+
+      const userIds = [...new Set(leaveData.map(l => l.user_id))];
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', userIds);
+
+      if (profileError) console.warn('Error loading profile data:', profileError);
+
+      const profileMap = (profileData || []).reduce((acc: any, p: any) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+
+      const leavesWithProfiles = leaveData.map(leave => ({
+        ...leave,
+        profiles: profileMap[leave.user_id] || null
+      }));
+
+      setLeaves(leavesWithProfiles as LeaveRequest[]);
     } catch (error) {
-      console.error('Error fetching leaves:', error);
+      console.error('Error fetching leaves:', error instanceof Error ? error.message : JSON.stringify(error));
     } finally {
       setLoading(false);
     }

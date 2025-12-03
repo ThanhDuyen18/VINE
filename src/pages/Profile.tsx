@@ -19,9 +19,10 @@ const profileSchema = z.object({
   first_name: z.string().min(1, "First name is required").max(100),
   last_name: z.string().min(1, "Last name is required").max(100),
   phone: z.string().optional().refine(
-    (val) => !val || /^\d{0,10}$/.test(val),
-    "Phone number must be exactly 10 digits (e.g. 0832686678)"
+    (val) => !val || /^\d{0,15}$/.test(val),
+    "Phone number cannot exceed 15 digits"
   ),
+
   date_of_birth: z.string().optional(),
 });
 
@@ -63,7 +64,7 @@ export default function Profile() {
   const [team, setTeam] = useState<Team | null>(null);
   const [shift, setShift] = useState<Shift | null>(null);
   // State cho Signed URL của CV (để hiển thị link tải về bảo mật)
-  const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null); 
+  const [cvSignedUrl, setCvSignedUrl] = useState<string | null>(null);
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -78,14 +79,14 @@ export default function Profile() {
   // Hàm tạo Signed URL (URL có thời hạn) cho file Private
   const getSignedUrl = useCallback(async (path: string) => {
     try {
-        // Thời hạn 60 giây
-        const { data } = await supabase.storage
-            .from('documents')
-            .createSignedUrl(path, 60); 
-        return data?.signedUrl || null;
+      // Thời hạn 60 giây
+      const { data } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(path, 60);
+      return data?.signedUrl || null;
     } catch (error) {
-        console.error("Error creating signed URL:", error);
-        return null;
+      console.error("Error creating signed URL:", error);
+      return null;
     }
   }, []);
 
@@ -114,13 +115,13 @@ export default function Profile() {
         phone: profileData.phone || "",
         date_of_birth: profileData.date_of_birth || "",
       });
-      
+
       // Xử lý Signed URL cho CV (nếu có cv_url)
       if (profileData && profileData.cv_url) {
-          const url = await getSignedUrl(profileData.cv_url);
-          setCvSignedUrl(url);
+        const url = await getSignedUrl(profileData.cv_url);
+        setCvSignedUrl(url);
       } else {
-          setCvSignedUrl(null);
+        setCvSignedUrl(null);
       }
 
       // Fetch Team Info
@@ -175,14 +176,14 @@ export default function Profile() {
       if (error) throw error;
 
       toast.success("Profile updated successfully");
-      
+
       // Tối ưu hóa: Cập nhật state cục bộ thay vì gọi lại loadProfile()
       setProfile(prevProfile => {
-          if (!prevProfile) return null;
-          return {
-              ...prevProfile,
-              ...updatedFields,
-          };
+        if (!prevProfile) return null;
+        return {
+          ...prevProfile,
+          ...updatedFields,
+        };
       });
 
     } catch (error) {
@@ -210,7 +211,7 @@ export default function Profile() {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       // ĐÚNG: SỬ DỤNG FULL PATH CHO STORAGE
-      const filePath = `avatars/${fileName}`; 
+      const filePath = `avatars/${fileName}`;
 
       // 1. Upload file
       const { error: uploadError } = await supabase.storage
@@ -233,14 +234,14 @@ export default function Profile() {
       if (updateError) throw updateError;
 
       toast.success("Avatar updated successfully");
-      
+
       // Tối ưu hóa: Cập nhật state cục bộ
       setProfile(prevProfile => {
-          if (!prevProfile) return null;
-          return {
-              ...prevProfile,
-              avatar_url: publicUrl,
-          };
+        if (!prevProfile) return null;
+        return {
+          ...prevProfile,
+          avatar_url: publicUrl,
+        };
       });
 
     } catch (error) {
@@ -252,27 +253,27 @@ export default function Profile() {
   };
 
   const handleCVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  try {
-   const file = event.target.files?.[0];
-   if (!file) return;
+    try {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-   if (file.size > 10 * 1024 * 1024) {
-    toast.error("File size must be less than 10MB");
-    return;
-   }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("File size must be less than 10MB");
+        return;
+      }
 
-   if (!file.type.includes("pdf")) {
-    toast.error("Only PDF files are allowed");
-    return;
-   }
+      if (!file.type.includes("pdf")) {
+        toast.error("Only PDF files are allowed");
+        return;
+      }
 
-   setUploading(true);
-   const { data: { user } } = await supabase.auth.getUser();
-   if (!user) return;
+      setUploading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-   const fileName = `${user.id}-cv-${Date.now()}.pdf`;
-   // ĐÚNG: SỬ DỤNG FULL PATH CHO STORAGE (documents/user-id-...)
-   const filePath = `documents/${fileName}`;
+      const fileName = `${user.id}-cv-${Date.now()}.pdf`;
+      // ĐÚNG: SỬ DỤNG FULL PATH CHO STORAGE (documents/user-id-...)
+      const filePath = `documents/${fileName}`;
 
       // 1. Upload file
       const { error: uploadError } = await supabase.storage
@@ -293,11 +294,11 @@ export default function Profile() {
 
       // Tối ưu hóa: Cập nhật state cục bộ và tạo Signed URL mới
       setProfile(prevProfile => {
-          if (!prevProfile) return null;
-          return {
-              ...prevProfile,
-              cv_url: filePath,
-          };
+        if (!prevProfile) return null;
+        return {
+          ...prevProfile,
+          cv_url: filePath,
+        };
       });
       // Tạo signed URL mới ngay sau khi upload
       const newSignedUrl = await getSignedUrl(filePath);
@@ -449,11 +450,11 @@ export default function Profile() {
                           rel="noopener noreferrer"
                           className={`text-sm font-medium ${cvSignedUrl ? 'text-primary hover:underline' : 'text-muted-foreground'}`}
                           onClick={(e) => {
-                              if (!cvSignedUrl) {
-                                  e.preventDefault();
-                                  toast.warning("Generating temporary URL, please try again soon.");
-                                  loadProfile(); // Tải lại để generate Signed URL
-                              }
+                            if (!cvSignedUrl) {
+                              e.preventDefault();
+                              toast.warning("Generating temporary URL, please try again soon.");
+                              loadProfile(); // Tải lại để generate Signed URL
+                            }
                           }}
                         >
                           {cvSignedUrl ? "View CV (PDF)" : "Loading secure link..."}
@@ -503,7 +504,7 @@ export default function Profile() {
               </div>
             </CardContent>
           </Card>
-          
+
           {/* Personal Information Card */}
           <Card className="shadow-medium transition-smooth hover:shadow-strong">
             <CardHeader>
@@ -561,10 +562,10 @@ export default function Profile() {
                                 {...field}
                                 type="tel"
                                 className="pl-10"
-                                maxLength={10}
+                                maxLength={15}
                                 placeholder="0832686678"
                                 onChange={(e) => {
-                                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                  const value = e.target.value.replace(/\D/g, '').slice(0, 15);
                                   field.onChange(value);
                                 }}
                               />
@@ -617,8 +618,8 @@ export default function Profile() {
             </CardContent>
           </Card>
 
-          
-         
+
+
         </div>
       </div>
     </DashboardLayout>
