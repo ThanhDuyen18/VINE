@@ -263,6 +263,14 @@ const BookingCalendar = ({ role }: { role: UserRole }) => {
         open={detailsDialogOpen}
         onOpenChange={setDetailsDialogOpen}
         onJoinLeave={fetchBookings}
+        onDelete={() => handleDeleteBooking(selectedBooking?.id)}
+      />
+
+      <EditBookingDialog
+        booking={selectedBooking}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onBookingUpdated={fetchBookings}
       />
 
       <CreateBookingDialog
