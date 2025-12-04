@@ -8,6 +8,7 @@ import RoleManagement from "@/components/organization/RoleManagement";
 import AttendanceSettings from "@/components/organization/AttendanceSettings";
 import TeamsManagement from "@/components/organization/TeamsManagement";
 import ShiftsManagement from "@/components/organization/ShiftsManagement";
+import LeaderTeamMembers from "@/components/organization/LeaderTeamMembers";
 
 const Organization = () => {
   const [role, setRole] = useState<UserRole>('staff');
@@ -22,17 +23,36 @@ const Organization = () => {
     loadRole();
   }, []);
 
-  if (role !== 'admin') {
+  if (role === 'staff') {
     return (
       <DashboardLayout role={role}>
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold">Access Denied</h2>
-          <p className="text-muted-foreground mt-2">Only admins can access this page.</p>
+          <p className="text-muted-foreground mt-2">Only leaders and admins can access this page.</p>
         </div>
       </DashboardLayout>
     );
   }
 
+  // Leader view
+  if (role === 'leader') {
+    return (
+      <DashboardLayout role={role}>
+        <div className="space-y-6 animate-fade-in pb-20 md:pb-6">
+          <div className="mb-2">
+            <h2 className="text-4xl font-heading font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+              Team Members
+            </h2>
+            <p className="text-muted-foreground mt-2">View and manage your team members</p>
+          </div>
+
+          <LeaderTeamMembers />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Admin view
   return (
     <DashboardLayout role={role}>
       <div className="space-y-6 animate-fade-in pb-20 md:pb-6">

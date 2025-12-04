@@ -110,13 +110,32 @@ const TaskCard = ({ task, onStatusChange, onTaskClick, columns, role, onTaskDele
           </div>
         )}
 
-        {task.assignee && (
-          <div className="flex items-center gap-2 text-xs">
-            <Avatar className="h-5 w-5">
-              <AvatarImage src={task.assignee.avatar_url || ''} />
-              <AvatarFallback>{getInitials(task.assignee.first_name, task.assignee.last_name)}</AvatarFallback>
-            </Avatar>
-            <span className="text-muted-foreground">{task.assignee.first_name} {task.assignee.last_name}</span>
+        {(task.creator || task.assignee) && (
+          <div className="space-y-1 text-xs">
+            {task.creator && (
+              <div className="flex items-center gap-2">
+                <Avatar className="h-5 w-5">
+                  <AvatarImage src={task.creator.avatar_url || ''} />
+                  <AvatarFallback>{getInitials(task.creator.first_name, task.creator.last_name)}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span className="text-muted-foreground text-xs">Reporter:</span>
+                  <span className="font-medium">{task.creator.first_name} {task.creator.last_name}</span>
+                </div>
+              </div>
+            )}
+            {task.assignee && (
+              <div className="flex items-center gap-2">
+                <Avatar className="h-5 w-5">
+                  <AvatarImage src={task.assignee.avatar_url || ''} />
+                  <AvatarFallback>{getInitials(task.assignee.first_name, task.assignee.last_name)}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span className="text-muted-foreground text-xs">Assignee:</span>
+                  <span className="font-medium">{task.assignee.first_name} {task.assignee.last_name}</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -6,17 +6,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { getCurrentUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { createNotification } from "@/lib/notifications";
 
-interface CreateBookingDialogProps {
+interface EditBookingDialogProps {
+  booking: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onBookingCreated: () => void;
+  onBookingUpdated: () => void;
 }
 
-const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBookingDialogProps) => {
+const EditBookingDialog = ({ booking, open, onOpenChange, onBookingUpdated }: EditBookingDialogProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [roomId, setRoomId] = useState("");
@@ -27,13 +26,15 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
   const { toast } = useToast();
 
   useEffect(() => {
-    if (open) {
+    if (open && booking) {
       fetchRooms();
-      const today = new Date().toISOString().split('T')[0];
-      setStartTime(`${today}T09:00`);
-      setEndTime(`${today}T10:00`);
+      setTitle(booking.title || "");
+      setDescription(booking.description || "");
+      setRoomId(booking.room_id || "");
+      setStartTime(booking.start_time || "");
+      setEndTime(booking.end_time || "");
     }
-  }, [open]);
+  }, [open, booking]);
 
   const fetchRooms = async () => {
     const { data } = await supabase
@@ -45,22 +46,23 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
     if (data) setRooms(data);
   };
 
-  const checkTimeConflict = async (roomId: string, startTime: string, endTime: string): Promise<boolean> => {
+  const checkTimeConflict = async (roomId: string, startTime: string, endTime: string, currentBookingId: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase
         .from('room_bookings')
         .select('*')
         .eq('room_id', roomId)
-        .eq('status', 'approved');
+        .eq('status', 'approved')
+        .neq('id', currentBookingId);
 
       if (error) throw error;
 
       const start = new Date(startTime).getTime();
       const end = new Date(endTime).getTime();
 
-      const hasConflict = data?.some(booking => {
-        const existingStart = new Date(booking.start_time).getTime();
-        const existingEnd = new Date(booking.end_time).getTime();
+      const hasConflict = data?.some(existingBooking => {
+        const existingStart = new Date(existingBooking.start_time).getTime();
+        const existingEnd = new Date(existingBooking.end_time).getTime();
 
         return !(end <= existingStart || start >= existingEnd);
       });
@@ -77,9 +79,6 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
     setLoading(true);
 
     try {
-      const user = await getCurrentUser();
-      if (!user) throw new Error("Not authenticated");
-
       if (!title || !roomId || !startTime || !endTime) {
         toast({
           title: "Validation Error",
@@ -116,7 +115,7 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
         return;
       }
 
-      const hasConflict = await checkTimeConflict(roomId, startTime, endTime);
+      const hasConflict = await checkTimeConflict(roomId, startTime, endTime, booking.id);
       if (hasConflict) {
         toast({
           title: "Booking Conflict",
@@ -127,53 +126,31 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
         return;
       }
 
-      const { data: bookingData, error } = await supabase.from('room_bookings').insert([{
-        title,
-        description: description || null,
-        room_id: roomId,
-        user_id: user.id,
-        start_time: startTime,
-        end_time: endTime,
-        status: 'pending'
-      }]).select();
+      const { error } = await supabase
+        .from('room_bookings')
+        .update({
+          title,
+          description: description || null,
+          room_id: roomId,
+          start_time: startTime,
+          end_time: endTime
+        })
+        .eq('id', booking.id);
 
       if (error) throw error;
 
-      // Create notification for admins/leaders about new booking
-      const { data: adminUsers } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .in('role', ['admin', 'leader'])
-        .neq('user_id', user.id);
-
-      if (adminUsers && adminUsers.length > 0) {
-        const roomData = rooms.find(r => r.id === roomId);
-        const roomName = roomData?.name || 'Unknown Room';
-
-        for (const admin of adminUsers) {
-          await createNotification({
-            userId: admin.user_id,
-            type: 'booking',
-            title: 'New Room Booking',
-            message: `New booking created: "${title}" in ${roomName}`,
-            link: '/meeting-rooms'
-          });
-        }
-      }
-
       toast({
         title: "Success",
-        description: "Booking created successfully"
+        description: "Booking updated successfully"
       });
 
-      onBookingCreated();
+      onBookingUpdated();
       onOpenChange(false);
-      resetForm();
     } catch (error) {
-      console.error('Error creating booking:', error);
+      console.error('Error updating booking:', error);
       toast({
         title: "Error",
-        description: "Failed to create booking",
+        description: "Failed to update booking",
         variant: "destructive"
       });
     } finally {
@@ -181,19 +158,13 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
     }
   };
 
-  const resetForm = () => {
-    setTitle("");
-    setDescription("");
-    setRoomId("");
-    setStartTime("");
-    setEndTime("");
-  };
+  if (!booking) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Create Booking</DialogTitle>
+          <DialogTitle>Edit Booking</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -261,7 +232,7 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Booking"}
+              {loading ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>
@@ -270,4 +241,4 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
   );
 };
 
-export default CreateBookingDialog;
+export default EditBookingDialog;

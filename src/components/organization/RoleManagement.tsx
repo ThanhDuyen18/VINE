@@ -22,9 +22,11 @@ interface UserWithRole {
     last_name: string | null;
     email: string;
     avatar_url: string | null;
-    cv_url: string | null; 
+    cv_url: string | null;
+    team_id: string | null;
+    team_name: string | null;
     current_role: 'admin' | 'leader' | 'staff';
-    new_role: 'leader' | 'staff'; 
+    new_role: 'leader' | 'staff';
     changed: boolean;
 }
 
@@ -53,11 +55,11 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
     const loadUsersWithRoles = useCallback(async () => {
         try {
             setLoading(true);
-            
+
             // LƯU Ý: Nếu lỗi schema vẫn xuất hiện, hãy chạy Supabase CLI
             const { data: profiles, error: profilesError } = await supabase
                 .from('profiles')
-                .select('id, first_name, last_name, email, avatar_url, cv_url')
+                .select('id, first_name, last_name, email, avatar_url, cv_url, team_id')
                 .order('first_name');
 
             if (profilesError) throw profilesError;
@@ -68,16 +70,37 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
 
             if (rolesError) throw rolesError;
 
+            const { data: teams, error: teamsError } = await supabase
+                .from('teams')
+                .select('id, name, leader_id');
+
+            if (teamsError) console.warn('Error loading teams:', teamsError);
+
+            const teamMap = new Map((teams || []).map(t => [t.id, t.name]));
+
             const usersWithRoles = (profiles || [])
                 .filter(profile => {
                     const role = roles?.find(r => r.user_id === profile.id)?.role || 'staff';
-                    return role !== 'admin'; 
+                    return role !== 'admin';
                 })
                 .map(profile => {
                     const role = (roles?.find(r => r.user_id === profile.id)?.role || 'staff') as 'admin' | 'leader' | 'staff';
-                    
+
                     // Đảm bảo new_role không bao giờ là 'admin'
                     const initialRole = (role === 'admin' ? 'staff' : role) as 'leader' | 'staff';
+
+                    // Check if user is a team member (has team_id) or team leader (leader_id)
+                    let teamName: string | null = null;
+                    if (profile.team_id) {
+                        // User is a team member
+                        teamName = teamMap.get(profile.team_id) || null;
+                    } else {
+                        // Check if user is a team leader
+                        const leaderTeam = (teams || []).find(t => t.leader_id === profile.id);
+                        if (leaderTeam) {
+                            teamName = leaderTeam.name || null;
+                        }
+                    }
 
                     return ({
                         id: profile.id,
@@ -85,7 +108,9 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
                         last_name: profile.last_name,
                         email: profile.email,
                         avatar_url: profile.avatar_url,
-                        cv_url: profile.cv_url, 
+                        cv_url: profile.cv_url,
+                        team_id: profile.team_id,
+                        team_name: teamName,
                         current_role: role,
                         new_role: initialRole,
                         changed: false
@@ -344,6 +369,7 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
                                     <TableRow>
                                         <TableHead>User</TableHead>
                                         <TableHead>Email</TableHead>
+                                        <TableHead>Team</TableHead>
                                         <TableHead>Documents</TableHead>
                                         <TableHead>Current Role</TableHead>
                                         <TableHead>New Role</TableHead>
@@ -366,6 +392,14 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
                                             </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {user.email}
+                                            </TableCell>
+
+                                            <TableCell>
+                                                {user.team_name ? (
+                                                    <Badge variant="secondary">{user.team_name}</Badge>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-sm">-</span>
+                                                )}
                                             </TableCell>
 
                                             {/* CELL XEM CV */}

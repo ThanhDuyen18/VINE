@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { createTaskNotification } from "@/lib/notifications";
 
 interface TaskColumn {
   id: string;
@@ -85,6 +86,28 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, columns = [] }: C
 
       if (!data || data.length === 0) {
         throw new Error("Task was not created");
+      }
+
+      // Create notification for assignee
+      if (assigneeId) {
+        const assignee = users.find(u => u.id === assigneeId);
+        if (assignee && user) {
+          const { data: creatorData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('id', user.id)
+            .single();
+
+          const creatorName = creatorData
+            ? `${creatorData.first_name} ${creatorData.last_name}`
+            : 'Someone';
+
+          await createTaskNotification(
+            assigneeId,
+            title.trim(),
+            creatorName
+          );
+        }
       }
 
       toast({

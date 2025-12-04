@@ -87,7 +87,7 @@ const DashboardLayout = ({ children, role = 'staff' }: DashboardLayoutProps) => 
     { icon: FileText, label: "Leave", path: "/leave" },
   ];
 
-  if (userRole === 'admin') {
+  if (userRole === 'admin' || userRole === 'leader') {
     menuItems.push({ icon: Settings, label: "Organization", path: "/organization" });
   }
 

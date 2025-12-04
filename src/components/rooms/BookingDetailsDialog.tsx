@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUser } from "@/lib/auth";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Users, LogIn, LogOut } from "lucide-react";
+import { Users, LogIn, LogOut, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface BookingDetailsDialogProps {
@@ -14,15 +14,17 @@ interface BookingDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onJoinLeave?: () => void;
+  onDelete?: (bookingId: string) => void;
 }
 
-const BookingDetailsDialog = ({ booking, open, onOpenChange, onJoinLeave }: BookingDetailsDialogProps) => {
+const BookingDetailsDialog = ({ booking, open, onOpenChange, onJoinLeave, onDelete }: BookingDetailsDialogProps) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [roomName, setRoomName] = useState("");
   const [creatorInfo, setCreatorInfo] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [isJoining, setIsJoining] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     if (open && booking) {
@@ -102,6 +104,27 @@ const BookingDetailsDialog = ({ booking, open, onOpenChange, onJoinLeave }: Book
       toast.error("Failed to update attendance");
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    setIsCancelling(true);
+    try {
+      const { error } = await supabase
+        .from('room_bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', booking.id);
+
+      if (error) throw error;
+
+      toast.success("Booking cancelled successfully");
+      onJoinLeave?.();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      toast.error("Failed to cancel booking");
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -189,26 +212,45 @@ const BookingDetailsDialog = ({ booking, open, onOpenChange, onJoinLeave }: Book
             </div>
           )}
 
-          {currentUser && currentUser.id !== creatorInfo?.id && (
-            <Button
-              onClick={handleJoinLeave}
-              disabled={isJoining}
-              className="w-full"
-              variant={hasJoined ? "destructive" : "default"}
-            >
-              {hasJoined ? (
-                <>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Leave Meeting
-                </>
-              ) : (
-                <>
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Join Meeting
-                </>
-              )}
-            </Button>
-          )}
+          <div className="space-y-2">
+            {currentUser && currentUser.id === creatorInfo?.id && booking.status !== 'cancelled' && (
+              <Button
+                onClick={() => {
+                  if (onDelete) {
+                    onDelete(booking.id);
+                  } else {
+                    handleCancelBooking();
+                  }
+                }}
+                disabled={isCancelling}
+                className="w-full"
+                variant="destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Booking
+              </Button>
+            )}
+            {currentUser && currentUser.id !== creatorInfo?.id && (
+              <Button
+                onClick={handleJoinLeave}
+                disabled={isJoining}
+                className="w-full"
+                variant={hasJoined ? "destructive" : "default"}
+              >
+                {hasJoined ? (
+                  <>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Leave Meeting
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Join Meeting
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

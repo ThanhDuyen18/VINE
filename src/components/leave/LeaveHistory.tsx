@@ -6,9 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { SkeletonTable } from "@/components/ui/skeleton-table";
+import { Edit2, Trash2 } from "lucide-react";
 
 interface LeaveRequest {
     id: string;
@@ -27,10 +30,16 @@ interface LeaveRequest {
 }
 
 const LeaveHistory = ({ role }: { role: UserRole }) => {
-  const [leaves, setLeaves] = useState<LeaveRequest[]>([]); 
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterMonth, setFilterMonth] = useState("");
   const [filterYear, setFilterYear] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<any>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchLeaves = useCallback(async () => {
@@ -38,27 +47,44 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
       const user = await getCurrentUser();
       if (!user) return;
 
-      let query = supabase
+      const leaveQuery = supabase
         .from('leave_requests')
-        .select(`
-          *,
-          profiles:user_id (
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (role === 'staff') {
-        query = query.eq('user_id', user.id);
+        leaveQuery.eq('user_id', user.id);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data: leaveData, error: leaveError } = await leaveQuery;
+      if (leaveError) throw leaveError;
 
-      setLeaves(data as unknown as LeaveRequest[] || []);
+      if (!leaveData || leaveData.length === 0) {
+        setLeaves([]);
+        return;
+      }
+
+      const userIds = [...new Set(leaveData.map(l => l.user_id))];
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', userIds);
+
+      if (profileError) console.warn('Error loading profile data:', profileError);
+
+      const profileMap = (profileData || []).reduce((acc: any, p: any) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+
+      const leavesWithProfiles = leaveData.map(leave => ({
+        ...leave,
+        profiles: profileMap[leave.user_id] || null
+      }));
+
+      setLeaves(leavesWithProfiles as LeaveRequest[]);
     } catch (error) {
-      console.error('Error fetching leaves:', error);
+      console.error('Error fetching leaves:', error instanceof Error ? error.message : JSON.stringify(error));
     } finally {
       setLoading(false);
     }
@@ -143,6 +169,125 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
     }
   };
 
+  const handleDelete = async (leaveId: string) => {
+    if (!confirm('Are you sure you want to delete this leave request?')) return;
+
+    try {
+      setDeleting(leaveId);
+      const { error } = await supabase
+        .from('leave_requests')
+        .delete()
+        .eq('id', leaveId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Leave request deleted"
+      });
+
+      fetchLeaves();
+    } catch (error) {
+      console.error('Error deleting leave:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete leave request",
+        variant: "destructive"
+      });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleEditStart = (leave: LeaveRequest) => {
+    setEditingId(leave.id);
+    setEditData({
+      start_date: leave.start_date,
+      end_date: leave.end_date,
+      reason: leave.reason
+    });
+  };
+
+  const handleEditSave = async (leaveId: string) => {
+    try {
+      if (!editData.start_date || !editData.end_date) {
+        toast({
+          title: "Error",
+          description: "Start date and end date are required",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (editData.start_date > editData.end_date) {
+        toast({
+          title: "Error",
+          description: "Start date must be before or equal to end date",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const user = await getCurrentUser();
+      if (!user) return;
+
+      // Check for duplicate dates
+      const { data: existingRequests, error: checkError } = await supabase
+        .from('leave_requests')
+        .select('start_date, end_date, status')
+        .eq('user_id', user.id)
+        .neq('id', leaveId)
+        .in('status', ['pending', 'approved']);
+
+      if (checkError) throw checkError;
+
+      const newStart = new Date(editData.start_date).getTime();
+      const newEnd = new Date(editData.end_date).getTime();
+
+      const hasConflict = existingRequests?.some(req => {
+        const existingStart = new Date(req.start_date).getTime();
+        const existingEnd = new Date(req.end_date).getTime();
+        return !(newEnd < existingStart || newStart > existingEnd);
+      });
+
+      if (hasConflict) {
+        toast({
+          title: "Error",
+          description: "You already have a leave request for this date range",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('leave_requests')
+        .update({
+          start_date: editData.start_date,
+          end_date: editData.end_date,
+          reason: editData.reason
+        })
+        .eq('id', leaveId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Leave request updated"
+      });
+
+      setEditingId(null);
+      setEditData(null);
+      fetchLeaves();
+    } catch (error) {
+      console.error('Error updating leave:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update leave request",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return <SkeletonTable rows={6} columns={role === 'leader' || role === 'admin' ? 7 : 5} />;
   }
@@ -154,13 +299,64 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
 
     const matchMonth = !filterMonth || leaveMonth === filterMonth;
     const matchYear = !filterYear || leaveYear === filterYear;
+    const matchStatus = filterStatus === 'all' || leave.status === filterStatus;
 
-    return matchMonth && matchYear;
+    let matchDateRange = true;
+    if (filterStartDate || filterEndDate) {
+      const leaveStartTime = new Date(leave.start_date).getTime();
+      const leaveEndTime = new Date(leave.end_date).getTime();
+
+      if (filterStartDate) {
+        const filterStart = new Date(filterStartDate).getTime();
+        matchDateRange = matchDateRange && leaveEndTime >= filterStart;
+      }
+
+      if (filterEndDate) {
+        const filterEnd = new Date(filterEndDate).getTime();
+        matchDateRange = matchDateRange && leaveStartTime <= filterEnd;
+      }
+    }
+
+    return matchMonth && matchYear && matchStatus && matchDateRange;
   });
 
   return (
     <div className="space-y-4">
       <div className="flex gap-4 flex-wrap items-end">
+        <div>
+          <Label htmlFor="filter-status">Status</Label>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="filter-start-date">Start Date</Label>
+          <Input
+            id="filter-start-date"
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label htmlFor="filter-end-date">End Date</Label>
+          <Input
+            id="filter-end-date"
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+            className="mt-1"
+          />
+        </div>
         <div>
           <Label htmlFor="filter-month">Month</Label>
           <select
@@ -208,7 +404,7 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
               <TableHead>End Date</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Submitted</TableHead>
-              {(role === 'leader' || role === 'admin') && <TableHead>Actions</TableHead>}
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -216,14 +412,45 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
               <TableRow key={leave.id}>
                 {(role === 'leader' || role === 'admin') && (
                   <TableCell>
-                    {leave.profiles ? 
-                      `${leave.profiles.first_name} ${leave.profiles.last_name}` 
+                    {leave.profiles ?
+                      `${leave.profiles.first_name} ${leave.profiles.last_name}`
                       : `User ID: ${leave.user_id?.substring(0, 8)}`}
                   </TableCell>
                 )}
-                <TableCell className="capitalize">{leave.type.replace('_', ' ')}</TableCell>
-                <TableCell>{format(new Date(leave.start_date), 'MMM dd, yyyy')}</TableCell>
-                <TableCell>{format(new Date(leave.end_date), 'MMM dd, yyyy')}</TableCell>
+                <TableCell className="capitalize">
+                  {editingId === leave.id ? (
+                    <Input
+                      type="text"
+                      value={leave.type}
+                      disabled
+                      className="w-full"
+                    />
+                  ) : (
+                    leave.type.replace('_', ' ')
+                  )}
+                </TableCell>
+                <TableCell>
+                  {editingId === leave.id ? (
+                    <Input
+                      type="date"
+                      value={editData?.start_date || ''}
+                      onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                    />
+                  ) : (
+                    format(new Date(leave.start_date), 'MMM dd, yyyy')
+                  )}
+                </TableCell>
+                <TableCell>
+                  {editingId === leave.id ? (
+                    <Input
+                      type="date"
+                      value={editData?.end_date || ''}
+                      onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
+                    />
+                  ) : (
+                    format(new Date(leave.end_date), 'MMM dd, yyyy')
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge
                     variant={
@@ -237,9 +464,51 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
                 <TableCell className="text-muted-foreground">
                   {format(new Date(leave.created_at), 'MMM dd, yyyy')}
                 </TableCell>
-                {(role === 'leader' || role === 'admin') && (
-                  <TableCell>
-                    {leave.status === 'pending' && (
+                <TableCell>
+                  <div className="flex gap-2 flex-wrap">
+                    {role === 'staff' && leave.status === 'pending' && (
+                      <>
+                        {editingId === leave.id ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleEditSave(leave.id)}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditStart(leave)}
+                            >
+                              <Edit2 className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDelete(leave.id)}
+                              disabled={deleting === leave.id}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
+                    {(role === 'leader' || role === 'admin') && leave.status === 'pending' && (
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -256,8 +525,8 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
                         </Button>
                       </div>
                     )}
-                  </TableCell>
-                )}
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
