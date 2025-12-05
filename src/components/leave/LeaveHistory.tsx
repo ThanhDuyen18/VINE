@@ -153,6 +153,8 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
 
       if (error) throw error;
 
+      await updateLeaveBalanceForReject()
+      
       toast({
         title: "Success",
         description: "Leave request rejected"
@@ -168,6 +170,33 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
       });
     }
   };
+
+  const updateLeaveBalanceForReject = async () => {
+    const user = await getCurrentUser();
+    // Load leave balance
+    const {data: profileData, error: profileError} = await supabase
+        .from('profiles')
+        .select('annual_leave_balance')
+        .eq('id', user.id)
+        .single();
+
+    if (profileError) {
+      console.error('Error loading profile data:', profileError);
+      return;
+    }
+    let newBalance = profileData.annual_leave_balance + 1;
+    if (newBalance >12) newBalance = 12;
+
+    const {error: updateError} = await supabase
+        .from('profiles')
+        .update({annual_leave_balance: newBalance})
+        .eq('id', user.id);
+
+    if (updateError) {
+      console.error('Error updating leave balance:', updateError);
+      return;
+    }
+  }
 
   const handleDelete = async (leaveId: string) => {
     if (!confirm('Are you sure you want to delete this leave request?')) return;
@@ -204,7 +233,7 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
     setEditData({
       start_date: leave.start_date,
       end_date: leave.end_date,
-      reason: leave.reason
+      // reason: leave.reason
     });
   };
 
