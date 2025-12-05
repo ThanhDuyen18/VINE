@@ -16,6 +16,11 @@ const STANDARD_LEAVE_TYPES = [
   { value: 'personal', label: 'Personal Leave' },
   { value: 'unpaid', label: 'Unpaid Leave' }
 ];
+type Approver = {
+  id: string;
+  first_name: string;
+  last_name: string;
+};
 
 const LeaveRequestForm = () => {
   const [type, setType] = useState("annual");
@@ -27,7 +32,7 @@ const LeaveRequestForm = () => {
   const [loading, setLoading] = useState(false);
   const [customLeaveTypes, setCustomLeaveTypes] = useState<any[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
-  const [approvers, setApprovers] = useState<any[]>([]);
+  const [approvers, setApprovers] = useState<Approver[]>([]);
   const [shifts, setShifts] = useState<any[]>([]);
   const [leaveBalance, setLeaveBalance] = useState(0);
   const [currentUserId, setCurrentUserId] = useState("");
@@ -35,7 +40,49 @@ const LeaveRequestForm = () => {
 
   useEffect(() => {
     loadData();
+    loadApprovers();
   }, []);
+
+  async function loadApprovers() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+      
+      // 1) Lấy danh sách user_ids có role = leader
+      const { data: rolesData, error: rolesError } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("role", "leader");
+
+      if (rolesError) {
+        console.error("Error loading user_roles:", rolesError);
+        return;
+      }
+
+      let userIds = rolesData?.map(r => r.user_id).filter(Boolean) ?? [];
+      userIds = userIds.filter(id => id !== currentUserId);
+      
+      if (userIds.length === 0) {
+        setApprovers([]);
+        return;
+      }
+
+      // 2) Query profiles (bảng có first_name, last_name)
+      const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .in("id", userIds);
+
+      if (profilesError) {
+        console.error("Error loading profiles:", profilesError);
+        return;
+      }
+
+      setApprovers(profilesData ?? []);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -53,30 +100,33 @@ const LeaveRequestForm = () => {
       setCustomLeaveTypes(typesData || []);
 
       // Load approvers (all users with leader role)
-      try {
-        const { data: leaderRoles, error: leaderError } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('role', 'leader');
+      // try {
+        // const { data: leaderRoles, error: leaderError } = await supabase
+        //   .from('user_roles')
+        //   .select('user_id')
+        //   .eq('role', 'leader');
+        //
+        // if (leaderError) throw leaderError;
 
-        if (leaderError) throw leaderError;
-
-        if (leaderRoles && leaderRoles.length > 0) {
-          const leaderIds = leaderRoles.map(r => r.user_id);
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .in('id', leaderIds);
-
-          if (profilesError) throw profilesError;
-          if (profilesData) {
-            setApprovers(profilesData);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading approvers:', err);
-        // Continue even if approvers fail to load
-      }
+        // if (leaderRoles && leaderRoles.length > 0) {
+          // const leaderIds = leaderRoles.map(r => r.user_id);
+          // const { data: profilesData, error: profilesError } = await supabase
+          //   .from('profiles')
+          //   .select('id, first_name, last_name, email')
+          //   .in('id', leaderIds);
+          //
+          // if (profilesError) throw profilesError;
+          // if (profilesData) {
+          //   console.log('Loaded approvers:', profilesData);
+          //   // setApprovers(profilesData);
+          // }else {
+          //   console.log('No approvers found');
+          // }
+        // }
+      // } catch (err) {
+      //   console.error('Error loading approvers:', err);
+      //   // Continue even if approvers fail to load
+      // }
 
       // Load shifts
       const { data: shiftsData, error: shiftsError } = await supabase
@@ -218,6 +268,8 @@ const LeaveRequestForm = () => {
         startDate,
         endDate
       );
+      
+      await updateLeaveBalanceForSubmit();
 
       toast({
         title: "Success",
@@ -237,6 +289,35 @@ const LeaveRequestForm = () => {
     }
   };
 
+  const updateLeaveBalanceForSubmit = async () => {
+    const user = await getCurrentUser();
+    // Load leave balance
+    const {data: profileData, error: profileError} = await supabase
+        .from('profiles')
+        .select('annual_leave_balance')
+        .eq('id', user.id)
+        .single();
+
+    if (profileError) {
+      console.error('Error loading profile data:', profileError);
+      return;
+    }
+    let newBalance = profileData.annual_leave_balance - 1;
+    if (newBalance < 0) newBalance = 0;
+
+    const {error: updateError} = await supabase
+        .from('profiles')
+        .update({annual_leave_balance: newBalance})
+        .eq('id', user.id);
+
+    if (updateError) {
+      console.error('Error updating leave balance:', updateError);
+      return;
+    }
+    
+    setLeaveBalance(newBalance);
+  }
+  
   const resetForm = () => {
     setType("annual");
     setStartDate("");

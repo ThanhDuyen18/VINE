@@ -174,12 +174,18 @@ const LeaderLeaveApproval = () => {
   };
 
   const handleReject = async () => {
-    if (!selectedRequest) return;
+    if (!selectedRequest) {
+      console.log('No selected request to reject');
+      return;
+    }
 
     setActionLoading(true);
     try {
       const user = await getCurrentUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No current user found');
+        return;
+      }
 
       const { error } = await supabase
         .from('leave_requests')
