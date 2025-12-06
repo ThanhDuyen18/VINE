@@ -127,13 +127,16 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
         return;
       }
 
+      const startTimeUTC = new Date(startTime).toISOString();
+      const endTimeUTC = new Date(endTime).toISOString();
+
       const { data: bookingData, error } = await supabase.from('room_bookings').insert([{
         title,
         description: description || null,
         room_id: roomId,
         user_id: user.id,
-        start_time: startTime,
-        end_time: endTime,
+        start_time: startTimeUTC,
+        end_time: endTimeUTC,
         status: 'pending'
       }]).select();
 
