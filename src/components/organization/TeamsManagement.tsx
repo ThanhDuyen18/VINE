@@ -146,12 +146,15 @@ const TeamsManagement = () => {
   };
 
   const getFilteredMembersForTeam = () => {
-    return users.filter((user) => {
+    const userNoTeam = users.filter((user) => {
       // Only allow staff users without a team
       const isStaffRole = user.role === 'staff';
       const hasNoTeam = !user.team_id;
+      console.log(`User ${user.first_name} - isStaffRole: ${isStaffRole}, hasNoTeam: ${hasNoTeam}`);
       return isStaffRole && hasNoTeam;
     });
+    console.log("Filtered members for team:", userNoTeam);
+    return userNoTeam;
   };
 
   const fetchTeamMembers = async (teamId: string) => {
@@ -562,7 +565,7 @@ const TeamsManagement = () => {
               Select members to add or remove from this team. Only staff without a team can be added.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-80 overflow-y-auto">
+          <div className="space-y-4 max-h-72 overflow-y-auto">
             {selectedTeam && teamMembers.map((member) => (
               <div key={member.id} className="flex items-center gap-3 p-3 rounded border">
                 <Checkbox
@@ -611,7 +614,7 @@ const TeamsManagement = () => {
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-5">
             <Button variant="outline" onClick={() => setMembersDialogOpen(false)}>
               Cancel
             </Button>
