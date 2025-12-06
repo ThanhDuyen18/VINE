@@ -127,8 +127,17 @@ const TeamsManagement = () => {
         console.warn("Error fetching user roles:", rolesError);
       }
 
+      const { data: teamsData, error: teamsError } = await supabase
+          .from("teams")
+          .select("id, leader_id");
+
+      if (teamsError) {
+        console.warn("Error fetching teams:", teamsError);
+      }
+      
       const roleMap = new Map((rolesData || []).map(r => [r.user_id, r.role]));
       const validUsers = (profilesData || []).filter((user) => user.id && user.id.trim() !== "");
+      const teamLeaderIds = new Set((teamsData || []).map((t) => t.leader_id).filter(Boolean));
 
       // Enrich users with role information
       const usersWithRoles = validUsers.map((user) => ({
@@ -136,8 +145,16 @@ const TeamsManagement = () => {
         role: (roleMap.get(user.id) || 'staff') as 'leader' | 'staff'
       }));
 
-      const leaderUsers = usersWithRoles.filter((user) => user.role === 'leader');
-
+      // Now filter leaders that:
+      // - have role === 'leader'
+      // - team_id is null (not belonging to any team)
+      // - user.id is not in teamLeaderIds (not leader of any team)
+      const leaderUsers = usersWithRoles.filter((u) =>
+          u.role === "leader" &&
+          (u.team_id === null || u.team_id === undefined) &&
+          !teamLeaderIds.has(u.id)
+      );
+      
       setUsers(usersWithRoles);
       setLeaders(leaderUsers);
     } catch (error) {
