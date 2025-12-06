@@ -42,6 +42,23 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
   const [deleting, setDeleting] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Auto-fill month and year based on date filters
+  useEffect(() => {
+    if (filterStartDate) {
+      const date = new Date(filterStartDate);
+      const newMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+      const newYear = date.getFullYear().toString();
+      if (filterMonth !== newMonth) setFilterMonth(newMonth);
+      if (filterYear !== newYear) setFilterYear(newYear);
+    } else if (filterEndDate) {
+      const date = new Date(filterEndDate);
+      const newMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+      const newYear = date.getFullYear().toString();
+      if (filterMonth !== newMonth) setFilterMonth(newMonth);
+      if (filterYear !== newYear) setFilterYear(newYear);
+    }
+  }, [filterStartDate, filterEndDate, filterMonth, filterYear]);
+
   const fetchLeaves = useCallback(async () => {
     try {
       const user = await getCurrentUser();
@@ -322,31 +339,41 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
   }
 
   const filteredLeaves = leaves.filter(leave => {
+    // Always check status filter
+    const matchStatus = filterStatus === 'all' || leave.status === filterStatus;
+
+    // If date range filters are used, prioritize them over month/year
+    if (filterStartDate || filterEndDate) {
+      const leaveStartTime = new Date(leave.start_date).getTime();
+      const leaveEndTime = new Date(leave.end_date).getTime();
+
+      let matchDateRange = true;
+
+      // Normalize filter start to start of day (inclusive)
+      if (filterStartDate) {
+        const filterStart = new Date(filterStartDate);
+        filterStart.setHours(0, 0, 0, 0);
+        matchDateRange = matchDateRange && leaveStartTime >= filterStart.getTime();
+      }
+
+      // Normalize filter end to end of day (inclusive)
+      if (filterEndDate) {
+        const filterEnd = new Date(filterEndDate);
+        filterEnd.setHours(23, 59, 59, 999);
+        matchDateRange = matchDateRange && leaveEndTime <= filterEnd.getTime();
+      }
+      return matchStatus && matchDateRange;
+    }
+
+    // Otherwise use month/year filters (based on leave.start_date)
     const startDate = new Date(leave.start_date);
     const leaveMonth = (startDate.getMonth() + 1).toString().padStart(2, '0');
     const leaveYear = startDate.getFullYear().toString();
 
     const matchMonth = !filterMonth || leaveMonth === filterMonth;
     const matchYear = !filterYear || leaveYear === filterYear;
-    const matchStatus = filterStatus === 'all' || leave.status === filterStatus;
 
-    let matchDateRange = true;
-    if (filterStartDate || filterEndDate) {
-      const leaveStartTime = new Date(leave.start_date).getTime();
-      const leaveEndTime = new Date(leave.end_date).getTime();
-
-      if (filterStartDate) {
-        const filterStart = new Date(filterStartDate).getTime();
-        matchDateRange = matchDateRange && leaveEndTime >= filterStart;
-      }
-
-      if (filterEndDate) {
-        const filterEnd = new Date(filterEndDate).getTime();
-        matchDateRange = matchDateRange && leaveStartTime <= filterEnd;
-      }
-    }
-
-    return matchMonth && matchYear && matchStatus && matchDateRange;
+    return matchStatus && matchMonth && matchYear;
   });
 
   return (
@@ -392,7 +419,8 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
             id="filter-month"
             value={filterMonth}
             onChange={(e) => setFilterMonth(e.target.value)}
-            className="mt-1 px-3 py-2 border rounded-md bg-background"
+            disabled={!!(filterStartDate || filterEndDate)}
+            className="mt-1 px-3 py-2 border rounded-md bg-background disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="">All Months</option>
             {Array.from({ length: 12 }, (_, i) => (
@@ -408,7 +436,8 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
             id="filter-year"
             value={filterYear}
             onChange={(e) => setFilterYear(e.target.value)}
-            className="mt-1 px-3 py-2 border rounded-md bg-background"
+            disabled={!!(filterStartDate || filterEndDate)}
+            className="mt-1 px-3 py-2 border rounded-md bg-background disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="">All Years</option>
             {Array.from({ length: 5 }, (_, i) => {

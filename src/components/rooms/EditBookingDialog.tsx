@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { format, parseISO } from "date-fns";
 
 interface EditBookingDialogProps {
   booking: any;
@@ -31,8 +32,14 @@ const EditBookingDialog = ({ booking, open, onOpenChange, onBookingUpdated }: Ed
       setTitle(booking.title || "");
       setDescription(booking.description || "");
       setRoomId(booking.room_id || "");
-      setStartTime(booking.start_time || "");
-      setEndTime(booking.end_time || "");
+      
+      if (booking.start_time) {
+        setStartTime(format(parseISO(booking.start_time), "yyyy-MM-dd'T'HH:mm"));
+      }
+      
+      if (booking.end_time) {
+        setEndTime(format(parseISO(booking.end_time), "yyyy-MM-dd'T'HH:mm"));
+      }
     }
   }, [open, booking]);
 
@@ -126,14 +133,17 @@ const EditBookingDialog = ({ booking, open, onOpenChange, onBookingUpdated }: Ed
         return;
       }
 
+      const startTimeUTC = new Date(startTime).toISOString();
+      const endTimeUTC = new Date(endTime).toISOString();
+
       const { error } = await supabase
         .from('room_bookings')
         .update({
           title,
           description: description || null,
           room_id: roomId,
-          start_time: startTime,
-          end_time: endTime
+          start_time: startTimeUTC,
+          end_time: endTimeUTC
         })
         .eq('id', booking.id);
 
