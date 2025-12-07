@@ -188,7 +188,7 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
     }
   };
 
-  const updateLeaveBalanceForReject = async () => {
+  const getLeaveBalance = async () => {
     const user = await getCurrentUser();
     // Load leave balance
     const {data: profileData, error: profileError} = await supabase
@@ -201,7 +201,14 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
       console.error('Error loading profile data:', profileError);
       return;
     }
-    let newBalance = profileData.annual_leave_balance + 1;
+    return profileData.annual_leave_balance;
+  }
+  
+  const updateLeaveBalanceForReject = async () => {
+    const user = await getCurrentUser();
+    const leaveBalance = await getLeaveBalance();
+    
+    let newBalance = leaveBalance + 1;
     if (newBalance >12) newBalance = 12;
 
     const {error: updateError} = await supabase
@@ -227,6 +234,7 @@ const LeaveHistory = ({ role }: { role: UserRole }) => {
 
       if (error) throw error;
 
+      await updateLeaveBalanceForReject()
       toast({
         title: "Success",
         description: "Leave request deleted"

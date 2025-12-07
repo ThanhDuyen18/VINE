@@ -199,6 +199,8 @@ const LeaderLeaveApproval = () => {
 
       if (error) throw error;
 
+      await updateLeaveBalanceForReject()
+
       toast({
         title: "Success",
         description: "Leave request rejected"
@@ -219,6 +221,40 @@ const LeaderLeaveApproval = () => {
       setActionLoading(false);
     }
   };
+
+  const updateLeaveBalanceForReject = async () => {
+    const user = await getCurrentUser();
+    // Load leave balance
+    const leaveBalance = await getLeaveBalance();
+    let newBalance = leaveBalance + 1;
+    if (newBalance >12) newBalance = 12;
+
+    const {error: updateError} = await supabase
+        .from('profiles')
+        .update({annual_leave_balance: newBalance})
+        .eq('id', user.id);
+
+    if (updateError) {
+      console.error('Error updating leave balance:', updateError);
+      return;
+    }
+  }
+
+  const getLeaveBalance = async () => {
+    const user = await getCurrentUser();
+    // Load leave balance
+    const {data: profileData, error: profileError} = await supabase
+        .from('profiles')
+        .select('annual_leave_balance')
+        .eq('id', user.id)
+        .single();
+
+    if (profileError) {
+      console.error('Error loading profile data:', profileError);
+      return;
+    }
+    return profileData.annual_leave_balance;
+  }
 
   const getFullName = (firstName: string | null, lastName: string | null) => {
     return [firstName, lastName].filter(Boolean).join(" ") || "N/A";

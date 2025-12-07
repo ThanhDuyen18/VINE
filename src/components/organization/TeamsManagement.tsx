@@ -255,6 +255,7 @@ const TeamsManagement = () => {
       });
     } finally {
       setSubmitting(false);
+      fetchUsers();
     }
   };
 

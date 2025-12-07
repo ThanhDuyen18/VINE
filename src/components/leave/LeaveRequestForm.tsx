@@ -138,24 +138,30 @@ const LeaveRequestForm = () => {
       setShifts(shiftsData || []);
 
       // Load leave balance
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('annual_leave_balance')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) {
-        // Set default balance if profile fetch fails
-        setLeaveBalance(12);
-      } else if (profileData) {
-        setLeaveBalance(profileData.annual_leave_balance || 12);
-      }
+      await getLeaveBalance();
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoadingTypes(false);
     }
   };
+  
+  const getLeaveBalance = async () => {
+    const user = await getCurrentUser();
+    // Load leave balance
+    const {data: profileData, error: profileError} = await supabase
+        .from('profiles')
+        .select('annual_leave_balance')
+        .eq('id', user.id)
+        .single();
+
+    if (profileError) {
+      console.error('Error loading profile data:', profileError);
+      return;
+    }
+    setLeaveBalance(profileData.annual_leave_balance);
+    return profileData.annual_leave_balance;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,6 +200,7 @@ const LeaveRequestForm = () => {
       }
 
       // Check leave balance (max 12 requests per year)
+      const leaveBalance = await getLeaveBalance();
       if (leaveBalance <= 0) {
         toast({
           title: "Error",
@@ -290,19 +297,10 @@ const LeaveRequestForm = () => {
   };
 
   const updateLeaveBalanceForSubmit = async () => {
+    const leaveBalance = await getLeaveBalance();
     const user = await getCurrentUser();
-    // Load leave balance
-    const {data: profileData, error: profileError} = await supabase
-        .from('profiles')
-        .select('annual_leave_balance')
-        .eq('id', user.id)
-        .single();
-
-    if (profileError) {
-      console.error('Error loading profile data:', profileError);
-      return;
-    }
-    let newBalance = profileData.annual_leave_balance - 1;
+    
+    let newBalance = leaveBalance - 1;
     if (newBalance < 0) newBalance = 0;
 
     const {error: updateError} = await supabase
