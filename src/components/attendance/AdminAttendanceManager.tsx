@@ -31,11 +31,9 @@ interface AttendanceRecord {
   timestamp: string;
   location: string | null;
   notes: string | null;
-  profiles: {
-    first_name: string | null;
-    last_name: string | null;
-    email: string;
-  } | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
 }
 
 const AdminAttendanceManager = () => {
@@ -83,36 +81,26 @@ const AdminAttendanceManager = () => {
     try {
       setLoading(true);
       const { start, end } = getDateRange();
-
-      let query = supabase
-        .from('attendance')
-        .select(`
-          id,
-          user_id,
-          type,
-          timestamp,
-          location,
-          notes,
-          profiles:user_id (
-            first_name,
-            last_name,
-            email
-          )
-        `)
-        .gte('timestamp', start)
-        .lte('timestamp', end)
-        .order('timestamp', { ascending: false });
-
-      const { data, error } = await query;
+      
+      const { data, error } = await supabase
+          .from('attendance_with_profiles')
+          .select('*')
+          .gte('timestamp', start)
+          .lte('timestamp', end)
+          .order('timestamp', { ascending: false });
 
       if (error) throw error;
-
+      
       let filteredData = data || [];
+
       if (searchUser) {
+        const q = searchUser.toLowerCase();
+
         filteredData = filteredData.filter(record => {
-          const name = `${record.profiles?.first_name || ''} ${record.profiles?.last_name || ''}`.toLowerCase();
-          const email = record.profiles?.email?.toLowerCase() || '';
-          return name.includes(searchUser.toLowerCase()) || email.includes(searchUser.toLowerCase());
+          const name = `${record.first_name || ''} ${record.last_name || ''}`.trim().toLowerCase();
+          const email = record.email?.toLowerCase() || '';
+
+          return name.includes(q) || email.includes(q);
         });
       }
 
@@ -137,8 +125,8 @@ const AdminAttendanceManager = () => {
       ...records.map(record => {
         const timestamp = new Date(record.timestamp);
         return [
-          `"${record.profiles?.first_name || ''} ${record.profiles?.last_name || ''}"`,
-          `"${record.profiles?.email || ''}"`,
+          `"${record.first_name || ''} ${record.last_name || ''}"`,
+          `"${record.email || ''}"`,
           record.type.replace('_', ' ').toUpperCase(),
           format(timestamp, 'yyyy-MM-dd'),
           format(timestamp, 'HH:mm:ss'),
@@ -285,10 +273,10 @@ const AdminAttendanceManager = () => {
                   {records.map((record) => (
                     <TableRow key={record.id}>
                       <TableCell className="font-medium">
-                        {record.profiles?.first_name} {record.profiles?.last_name}
+                        {record.first_name} {record.last_name}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {record.profiles?.email}
+                        {record.email}
                       </TableCell>
                       <TableCell>
                         <Badge
