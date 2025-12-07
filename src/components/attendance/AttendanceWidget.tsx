@@ -118,7 +118,10 @@ const AttendanceWidget = () => {
 
     let totalHours = 0;
     let validDays = 0;
+    let totalCheckIns = 0;
+    let lateCheckIns = 0;
 
+    // Calculate hours and on-time rate
     Object.values(dateGroups).forEach(dayRecords => {
       const checkIn = dayRecords.find(r => r.type === 'check_in');
       const checkOut = dayRecords.find(r => r.type === 'check_out');
@@ -133,11 +136,43 @@ const AttendanceWidget = () => {
       }
     });
 
+    // Calculate on-time rate for the last year
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    // Get onTime setting from localStorage
+    const saved = localStorage.getItem('attendanceSettings');
+    const settings = saved ? JSON.parse(saved) : {};
+    const onTimeStr: string = settings.onTime || '09:00';
+    const [h, m] = onTimeStr.split(':').map((v: string) => parseInt(v, 10));
+
+    // Filter records from last year
+    const yearRecords = records.filter(r => {
+      const recordDate = new Date(r.timestamp);
+      return recordDate >= oneYearAgo && r.type === 'check_in';
+    });
+
+    totalCheckIns = yearRecords.length;
+
+    // Count late check-ins
+    yearRecords.forEach(record => {
+      const checkInDate = new Date(record.timestamp);
+      const checkInDateStr = record.timestamp.split('T')[0];
+      const onTimeDate = new Date(`${checkInDateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
+
+      if (checkInDate.getTime() > onTimeDate.getTime()) {
+        lateCheckIns += 1;
+      }
+    });
+
+    const onTimeRateValue = totalCheckIns > 0 ? Math.round((lateCheckIns / totalCheckIns) * 100) : 0;
+    const onTimePercentage = 100 - onTimeRateValue;
+
     setStats({
       totalHours,
       totalDays: Object.keys(dateGroups).length,
       averageHoursPerDay: validDays > 0 ? totalHours / validDays : 0,
-      onTimeRate: 95 // Mock for now
+      onTimeRate: onTimePercentage
     });
   };
 
@@ -274,6 +309,32 @@ const AttendanceWidget = () => {
   const hasCheckedOut = todayRecords.some(r => r.type === 'check_out');
   const latestCheckIn = todayRecords.find(r => r.type === 'check_in');
 
+  // Helper function to get on-time status and styling
+  const getOnTimeStatus = (rate: number) => {
+    if (rate >= 80) {
+      return {
+        label: 'Excellent',
+        color: 'text-success',
+        bgColor: 'bg-success/10 border-success/30',
+        description: 'Keep up the great work!'
+      };
+    } else if (rate >= 50) {
+      return {
+        label: 'Warning',
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-50 border-yellow-200',
+        description: 'Try coming in earlier'
+      };
+    } else {
+      return {
+        label: 'Bad',
+        color: 'text-destructive',
+        bgColor: 'bg-destructive/10 border-destructive/30',
+        description: 'Improve your punctuality'
+      };
+    }
+  };
+
   let workingHoursToday = 0;
   if (latestCheckIn) {
     const endTime = hasCheckedOut 
@@ -391,10 +452,26 @@ const AttendanceWidget = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.onTimeRate}%</div>
-            <p className="text-xs text-success mt-1">Excellent</p>
+            <p className={`text-xs mt-1 ${getOnTimeStatus(stats.onTimeRate).color}`}>
+              {getOnTimeStatus(stats.onTimeRate).label}
+            </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* On-time Status Card */}
+      {stats.onTimeRate < 100 && (
+        <Card className={`shadow-soft border ${getOnTimeStatus(stats.onTimeRate).bgColor}`}>
+          <CardContent className="pt-6">
+            <p className={`text-sm font-medium ${getOnTimeStatus(stats.onTimeRate).color}`}>
+              {getOnTimeStatus(stats.onTimeRate).description}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Based on your check-in records from the last 12 months.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* History */}
       <Card className="shadow-medium">
