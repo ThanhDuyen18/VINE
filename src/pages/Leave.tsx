@@ -51,9 +51,7 @@ const Leave = () => {
             {role === 'admin' && (
               <TabsTrigger value="types" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Leave Types</TabsTrigger>
             )}
-            {role === 'leader' && (
-              <TabsTrigger value="approval" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Team Approval</TabsTrigger>
-            )}
+            {/* Team Approval tab removed for leaders */}
             {role !== 'admin' && (
               <TabsTrigger value="request" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">My Requests</TabsTrigger>
             )}
@@ -64,18 +62,7 @@ const Leave = () => {
               <LeaveTypeManagement />
             </TabsContent>
           )}
-          {role === 'leader' && (
-            <TabsContent value="approval" className="mt-6">
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-900">
-                    <strong>Team Leave Approvals:</strong> Review and manage leave requests from your team members below.
-                  </p>
-                </div>
-                <LeaderLeaveApproval />
-              </div>
-            </TabsContent>
-          )}
+          {/* Leader team approval UI intentionally removed */}
           {role !== 'admin' && (
             <TabsContent value="request" className="mt-6">
               {role === 'staff' ? (
