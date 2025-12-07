@@ -74,7 +74,7 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
       const { data, error } = await supabase
         .from('task_columns')
         .select()
-        .eq('created_by', user.id)
+        // .eq('created_by', user.id)
         .order('position', { ascending: true });
 
       if (error) throw error;
@@ -167,7 +167,7 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
-        .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
+        // .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

@@ -46,7 +46,7 @@ const TaskList = ({ role }: { role: UserRole }) => {
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
-        .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
+        // .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
