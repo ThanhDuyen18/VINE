@@ -4,6 +4,7 @@ import { getUserRole, getCurrentUser } from "@/lib/auth";
 import { UserRole } from "@/lib/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import UsersManagement from "@/components/organization/UsersManagement";
+import UserDirectory from "@/components/organization/UserDirectory";
 import RoleManagement from "@/components/organization/RoleManagement";
 import AttendanceSettings from "@/components/organization/AttendanceSettings";
 import TeamsManagement from "@/components/organization/TeamsManagement";
@@ -66,6 +67,7 @@ const Organization = () => {
         <Tabs defaultValue="users" className="w-full">
           <TabsList className="bg-secondary shadow-soft">
             <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Users & Approval</TabsTrigger>
+            <TabsTrigger value="user" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">User</TabsTrigger>
             <TabsTrigger value="teams" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Teams</TabsTrigger>
             <TabsTrigger value="shifts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Shifts</TabsTrigger>
             <TabsTrigger value="roles" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Role Management</TabsTrigger>
@@ -73,6 +75,9 @@ const Organization = () => {
           </TabsList>
           <TabsContent value="users" className="mt-6">
             <UsersManagement />
+          </TabsContent>
+          <TabsContent value="user" className="mt-6">
+            <UserDirectory />
           </TabsContent>
           <TabsContent value="teams" className="mt-6">
             <TeamsManagement />
