@@ -14,6 +14,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast"; 
 import { Save, RotateCcw, FileText, Loader2, Trash2 } from "lucide-react"; 
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
 
 // Định nghĩa Interface
 interface UserWithRole {
@@ -170,6 +178,46 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
                 variant: "destructive",
                 duration: 5000,
             });
+        }
+    };
+
+    // --- VIEW PROFILE DETAIL DIALOG ---
+    const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+    const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
+
+    const handleViewDetail = async (userId: string) => {
+        setProfileDialogOpen(true);
+        setSelectedProfile(null);
+        try {
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            if (profileError) throw profileError;
+
+            const { data: roleData } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            const { data: teamData } = await supabase
+                .from('teams')
+                .select('id, name')
+                .eq('id', profile.team_id)
+                .maybeSingle();
+
+            setSelectedProfile({
+                ...profile,
+                role: roleData?.role || 'staff',
+                team_name: teamData?.name || null,
+            });
+        } catch (error) {
+            console.error('Error loading profile detail:', error);
+            toast({ title: 'Error', description: 'Failed to load profile details', variant: 'destructive' });
+            setProfileDialogOpen(false);
         }
     };
 
@@ -402,22 +450,34 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
                                                 )}
                                             </TableCell>
 
-                                            {/* CELL XEM CV */}
+                                            {/* CELL XEM CV + VIEW DETAIL */}
                                             <TableCell>
-                                                {user.cv_url ? (
+                                                <div className="flex items-center gap-2">
+                                                    {user.cv_url ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-7 text-xs"
+                                                            onClick={() => handleViewCV(user.cv_url!)} 
+                                                        >
+                                                            <FileText className="h-3 w-3 mr-1" />
+                                                            View CV
+                                                        </Button>
+                                                    ) : (
+                                                        <span className="text-muted-foreground/70 text-xs italic">N/A</span>
+                                                    )}
+
                                                     <Button
                                                         size="sm"
-                                                        variant="outline"
+                                                        variant="ghost"
                                                         className="h-7 text-xs"
-                                                        onClick={() => handleViewCV(user.cv_url!)} 
+                                                        onClick={() => handleViewDetail(user.id)}
                                                     >
-                                                        <FileText className="h-3 w-3 mr-1" />
-                                                        View CV
+                                                        View
                                                     </Button>
-                                                ) : (
-                                                    <span className="text-muted-foreground/70 text-xs italic">N/A</span>
-                                                )}
+                                                </div>
                                             </TableCell>
+
 
                                             <TableCell>
                                                 <Badge variant="outline" className="capitalize">
@@ -471,6 +531,73 @@ const EDGE_FUNCTION_URL = 'https://tyverlryifverobjwauo.supabase.co/functions/v1
                     )}
                 </CardContent>
             </Card>
+
+                    {/* Profile Detail Dialog */}
+                    <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Profile Details</DialogTitle>
+                                <DialogDescription>Read-only user profile information</DialogDescription>
+                            </DialogHeader>
+
+                            {selectedProfile ? (
+                                <div className="space-y-4 mt-2">
+                                    <div className="flex items-center gap-4">
+                                        <Avatar className="h-14 w-14">
+                                            <AvatarImage src={selectedProfile.avatar_url || undefined} />
+                                            <AvatarFallback>{getInitials(selectedProfile.first_name, selectedProfile.last_name)}</AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <div className="text-lg font-semibold">{selectedProfile.first_name} {selectedProfile.last_name}</div>
+                                            <div className="text-sm text-muted-foreground">{selectedProfile.email}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">Phone</div>
+                                            <div>{selectedProfile.phone || '-'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">Date of Birth</div>
+                                            <div>{selectedProfile.date_of_birth || '-'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">Team</div>
+                                            <div>{selectedProfile.team_name || '-'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">Role</div>
+                                            <div>{selectedProfile.role || '-'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">Annual Leave</div>
+                                            <div>{selectedProfile.annual_leave_balance ?? '-'} days</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">Created</div>
+                                            <div>{selectedProfile.created_at ? new Date(selectedProfile.created_at).toLocaleString() : '-'}</div>
+                                        </div>
+                                    </div>
+
+                                    {selectedProfile.cv_url && (
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">CV</div>
+                                            <a className="text-primary" href={selectedProfile.cv_url} target="_blank" rel="noreferrer">View CV</a>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="py-6 text-center">
+                                    <Loader2 className="animate-spin mx-auto" />
+                                </div>
+                            )}
+
+                            <DialogFooter>
+                                <Button variant="ghost" onClick={() => setProfileDialogOpen(false)}>Close</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
 
             {/* Info Card */}
             <Card className="shadow-soft bg-blue-50 border-blue-200">
