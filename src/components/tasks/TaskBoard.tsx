@@ -48,6 +48,7 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [currentUserId, setCurrentUserId] = useState("");
   const [users, setUsers] = useState<any[]>([]);
   const { toast } = useToast();
 
@@ -161,6 +162,9 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
     try {
       const user = await getCurrentUser();
       if (!user) return;
+      setCurrentUserId(user.id);
+      // default assignee filter: show only my tasks for non-admins
+      setAssigneeFilter(role === 'admin' ? 'all' : user.id);
 
       const { data, error } = await supabase
         .from('tasks')
@@ -215,6 +219,8 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
   useEffect(() => {
     Promise.all([fetchColumns(), fetchUsers()]);
 
+    // assigneeFilter is set after we fetch the current user (see fetchTasks)
+
     const channel = supabase
       .channel('tasks-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
@@ -235,6 +241,11 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
       fetchTasks();
     }
   }, [columns]);
+
+  useEffect(() => {
+    // when role changes, refresh tasks and set assignee filter appropriately (fetchTasks will update filter)
+    fetchTasks();
+  }, [role]);
 
   const handleStatusChange = async (taskId: string, newColumnId: string) => {
     try {
@@ -410,6 +421,8 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
         onOpenChange={setEditDialogOpen}
         onTaskUpdated={fetchTasks}
         columns={columns}
+        role={role}
+        currentUserId={currentUserId}
       />
     </div>
   );

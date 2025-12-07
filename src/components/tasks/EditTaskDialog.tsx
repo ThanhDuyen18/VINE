@@ -17,6 +17,7 @@ interface Task {
   deadline: string | null;
   column_id: string | null;
   assignee_id: string | null;
+  completed_at?: string | null;
 }
 
 interface TaskColumn {
@@ -31,15 +32,18 @@ interface EditTaskDialogProps {
   onOpenChange: (open: boolean) => void;
   onTaskUpdated: () => void;
   columns?: TaskColumn[];
+  role?: 'admin' | 'leader' | 'staff';
+  currentUserId?: string;
 }
 
-const EditTaskDialog = ({ task, open, onOpenChange, onTaskUpdated, columns = [] }: EditTaskDialogProps) => {
+const EditTaskDialog = ({ task, open, onOpenChange, onTaskUpdated, columns = [], role, currentUserId }: EditTaskDialogProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("medium");
   const [columnId, setColumnId] = useState("");
   const [deadline, setDeadline] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
+  const [completedAt, setCompletedAt] = useState("");
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -49,8 +53,18 @@ const EditTaskDialog = ({ task, open, onOpenChange, onTaskUpdated, columns = [] 
       setDescription(task.description || "");
       setPriority(task.priority);
       setColumnId(task.column_id || "");
-      setDeadline(task.deadline || "");
+      // date inputs expect YYYY-MM-DD; normalize stored values
+      const toInputDate = (v?: string | null) => {
+        if (!v) return "";
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return v;
+        return d.toISOString().slice(0, 10);
+      };
+
+      setDeadline(toInputDate(task.deadline));
       setAssigneeId(task.assignee_id || "unassigned");
+      // completed_at is optional
+      setCompletedAt(toInputDate((task as any).completed_at));
       fetchUsers();
     }
   }, [task, open]);
@@ -71,6 +85,17 @@ const EditTaskDialog = ({ task, open, onOpenChange, onTaskUpdated, columns = [] 
     setLoading(true);
 
     try {
+      // Permission check: staff/leader can only update tasks assigned to themselves
+      const callerRole = role || 'staff';
+      const callerId = currentUserId || '';
+      // allow if either the original task assignee or the selected assignee matches caller
+      const effectiveAssignee = assigneeId === 'unassigned' ? null : assigneeId || task.assignee_id;
+      if (callerRole !== 'admin' && String(effectiveAssignee) !== String(callerId)) {
+        toast.error('Task này không phải của bạn');
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('tasks')
         .update({
@@ -80,6 +105,7 @@ const EditTaskDialog = ({ task, open, onOpenChange, onTaskUpdated, columns = [] 
           column_id: columnId || null,
           deadline: deadline || null,
           assignee_id: assigneeId === 'unassigned' ? null : assigneeId || null,
+          completed_at: completedAt || null,
         })
         .eq('id', task.id);
 
@@ -89,8 +115,9 @@ const EditTaskDialog = ({ task, open, onOpenChange, onTaskUpdated, columns = [] 
       onTaskUpdated();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error updating task:', error);
-      toast.error("Failed to update task");
+      const errMsg = (error as any)?.message || (error as any)?.error?.message || JSON.stringify(error);
+      console.error('Error updating task:', errMsg, error);
+      toast.error(errMsg || "Failed to update task");
     } finally {
       setLoading(false);
     }
@@ -187,6 +214,16 @@ const EditTaskDialog = ({ task, open, onOpenChange, onTaskUpdated, columns = [] 
               type="date"
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="completed_at">Completed Date (optional)</Label>
+            <Input
+              id="completed_at"
+              type="date"
+              value={completedAt}
+              onChange={(e) => setCompletedAt(e.target.value)}
             />
           </div>
 

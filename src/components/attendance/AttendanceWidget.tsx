@@ -35,7 +35,7 @@ const AttendanceWidget = () => {
     totalHours: 0,
     totalDays: 0,
     averageHoursPerDay: 0,
-    onTimeRate: 100
+    onTimeRate: 100,
   });
   const [userId, setUserId] = useState<string>("");
 
@@ -119,7 +119,13 @@ const AttendanceWidget = () => {
     let totalHours = 0;
     let validDays = 0;
     let totalCheckIns = 0;
-    let lateCheckIns = 0;
+    let onTimeCheckIns = 0;
+
+    // Get on-time cutoff from settings
+    const saved = localStorage.getItem('attendanceSettings');
+    const settings = saved ? JSON.parse(saved) : {};
+    const onTimeStr: string = settings.onTime || '09:00';
+    const [h, m] = onTimeStr.split(':').map((v: string) => parseInt(v, 10));
 
     // Calculate hours and on-time rate
     Object.values(dateGroups).forEach(dayRecords => {
@@ -134,45 +140,28 @@ const AttendanceWidget = () => {
         totalHours += hours;
         validDays++;
       }
-    });
 
-    // Calculate on-time rate for the last year
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      // Count on-time vs total check-ins
+      if (checkIn) {
+        totalCheckIns++;
+        const checkInDate = new Date(checkIn.timestamp);
+        const checkInLocalHours = checkInDate.getHours();
+        const checkInLocalMinutes = checkInDate.getMinutes();
 
-    // Get onTime setting from localStorage
-    const saved = localStorage.getItem('attendanceSettings');
-    const settings = saved ? JSON.parse(saved) : {};
-    const onTimeStr: string = settings.onTime || '09:00';
-    const [h, m] = onTimeStr.split(':').map((v: string) => parseInt(v, 10));
-
-    // Filter records from last year
-    const yearRecords = records.filter(r => {
-      const recordDate = new Date(r.timestamp);
-      return recordDate >= oneYearAgo && r.type === 'check_in';
-    });
-
-    totalCheckIns = yearRecords.length;
-
-    // Count late check-ins
-    yearRecords.forEach(record => {
-      const checkInDate = new Date(record.timestamp);
-      const checkInDateStr = record.timestamp.split('T')[0];
-      const onTimeDate = new Date(`${checkInDateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
-
-      if (checkInDate.getTime() > onTimeDate.getTime()) {
-        lateCheckIns += 1;
+        // Check if on-time (local time comparison)
+        if (checkInLocalHours < h || (checkInLocalHours === h && checkInLocalMinutes <= m)) {
+          onTimeCheckIns++;
+        }
       }
     });
 
-    const onTimeRateValue = totalCheckIns > 0 ? Math.round((lateCheckIns / totalCheckIns) * 100) : 0;
-    const onTimePercentage = 100 - onTimeRateValue;
+    const onTimePercentage = totalCheckIns > 0 ? Math.round((onTimeCheckIns / totalCheckIns) * 100) : 100;
 
     setStats({
       totalHours,
       totalDays: Object.keys(dateGroups).length,
       averageHoursPerDay: validDays > 0 ? totalHours / validDays : 0,
-      onTimeRate: onTimePercentage
+      onTimeRate: onTimePercentage,
     });
   };
 
@@ -309,31 +298,7 @@ const AttendanceWidget = () => {
   const hasCheckedOut = todayRecords.some(r => r.type === 'check_out');
   const latestCheckIn = todayRecords.find(r => r.type === 'check_in');
 
-  // Helper function to get on-time status and styling
-  const getOnTimeStatus = (rate: number) => {
-    if (rate >= 80) {
-      return {
-        label: 'Excellent',
-        color: 'text-success',
-        bgColor: 'bg-success/10 border-success/30',
-        description: 'Keep up the great work!'
-      };
-    } else if (rate >= 50) {
-      return {
-        label: 'Warning',
-        color: 'text-yellow-600',
-        bgColor: 'bg-yellow-50 border-yellow-200',
-        description: 'Try coming in earlier'
-      };
-    } else {
-      return {
-        label: 'Bad',
-        color: 'text-destructive',
-        bgColor: 'bg-destructive/10 border-destructive/30',
-        description: 'Improve your punctuality'
-      };
-    }
-  };
+
 
   let workingHoursToday = 0;
   if (latestCheckIn) {
@@ -342,6 +307,64 @@ const AttendanceWidget = () => {
       : new Date();
     workingHoursToday = differenceInHours(endTime, new Date(latestCheckIn.timestamp));
   }
+
+  // Helper function to determine if check-in is on-time or late (only for check_in records)
+  const getCheckInStatus = (record: AttendanceRecord) => {
+    if (record.type !== 'check_in') return null;
+
+    const saved = localStorage.getItem('attendanceSettings');
+    const settings = saved ? JSON.parse(saved) : {};
+    const onTimeStr: string = settings.onTime || '09:00';
+    const [h, m] = onTimeStr.split(':').map((v: string) => parseInt(v, 10));
+
+    const checkInDate = new Date(record.timestamp);
+    // Get local time (browser's timezone) from the check-in timestamp
+    const checkInLocalHours = checkInDate.getHours();
+    const checkInLocalMinutes = checkInDate.getMinutes();
+
+    console.log(`[DEBUG] Check-in record timestamp: ${record.timestamp}`);
+    console.log(`[DEBUG] Check-in local time: ${checkInLocalHours}:${String(checkInLocalMinutes).padStart(2, '0')}`);
+    console.log(`[DEBUG] On-time cutoff (local): ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    console.log(`[DEBUG] Browser timezone offset: ${new Date().getTimezoneOffset()} minutes`);
+
+    // Compare using local time since onTime setting is in local time
+    if (checkInLocalHours < h || (checkInLocalHours === h && checkInLocalMinutes <= m)) {
+      console.log(`[DEBUG] Result: ON-TIME`);
+      return { status: 'on-time', label: 'On-time', color: 'bg-success/10 text-success', icon: '✓' };
+    } else {
+      console.log(`[DEBUG] Result: LATE`);
+      return { status: 'late', label: 'Late', color: 'bg-destructive/10 text-destructive', icon: '!' };
+    }
+  };
+
+  // Helper function to get on-time status styling and description
+  const getOnTimeStatus = (rate: number) => {
+    if (rate >= 80) {
+      return {
+        label: 'Excellent',
+        color: 'text-success',
+        bgColor: 'bg-success/10 border-success/30',
+        description: 'Great attendance! Keep it up.',
+        badgeColor: 'bg-success/20 text-success'
+      };
+    } else if (rate >= 50) {
+      return {
+        label: 'Warning',
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-50 border-yellow-200',
+        description: 'Try coming in earlier to improve your on-time rate.',
+        badgeColor: 'bg-yellow-100 text-yellow-800'
+      };
+    } else {
+      return {
+        label: 'Bad',
+        color: 'text-destructive',
+        bgColor: 'bg-destructive/10 border-destructive/30',
+        description: 'Please improve your punctuality. Come in earlier.',
+        badgeColor: 'bg-destructive/20 text-destructive'
+      };
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -433,45 +456,27 @@ const AttendanceWidget = () => {
           </CardContent>
         </Card>
 
-        <Card className="shadow-soft">
+        <Card className={`shadow-soft border ${getOnTimeStatus(stats.onTimeRate).bgColor}`}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Hours/Day</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.averageHoursPerDay.toFixed(1)}h</div>
-            <p className="text-xs text-success mt-1">
-              <TrendingUp className="inline h-3 w-3 mr-1" />
-              On track
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-soft">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">On-time Rate</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">On-time Rate</CardTitle>
+              <Badge className={getOnTimeStatus(stats.onTimeRate).badgeColor}>
+                {getOnTimeStatus(stats.onTimeRate).label}
+              </Badge>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.onTimeRate}%</div>
-            <p className={`text-xs mt-1 ${getOnTimeStatus(stats.onTimeRate).color}`}>
-              {getOnTimeStatus(stats.onTimeRate).label}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* On-time Status Card */}
-      {stats.onTimeRate < 100 && (
-        <Card className={`shadow-soft border ${getOnTimeStatus(stats.onTimeRate).bgColor}`}>
-          <CardContent className="pt-6">
-            <p className={`text-sm font-medium ${getOnTimeStatus(stats.onTimeRate).color}`}>
+            <p className={`text-xs mt-3 ${getOnTimeStatus(stats.onTimeRate).color}`}>
               {getOnTimeStatus(stats.onTimeRate).description}
             </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Based on your check-in records from the last 12 months.
-            </p>
           </CardContent>
         </Card>
-      )}
+
+
+      </div>
+
+
 
       {/* History */}
       <Card className="shadow-medium">
@@ -492,33 +497,43 @@ const AttendanceWidget = () => {
               {allRecords.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No attendance records yet</p>
               ) : (
-                allRecords.slice(0, 10).map((record) => (
-                  <div key={record.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        record.type === 'check_in' ? 'bg-success/10' : 'bg-muted'
-                      }`}>
-                        {record.type === 'check_in' ? (
-                          <CheckCircle2 className="h-5 w-5 text-success" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-muted-foreground" />
-                        )}
+                allRecords.slice(0, 10).map((record) => {
+                  const checkInStatus = getCheckInStatus(record);
+                  return (
+                    <div key={record.id} className="flex items-center justify-between p-3 rounded-lg border">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          record.type === 'check_in' ? 'bg-success/10' : 'bg-muted'
+                        }`}>
+                          {record.type === 'check_in' ? (
+                            <CheckCircle2 className="h-5 w-5 text-success" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium capitalize">{record.type.replace('_', ' ')}</p>
+                            {checkInStatus && (
+                              <Badge className={`text-xs ${checkInStatus.color}`}>
+                                {checkInStatus.label}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(record.timestamp), 'MMM dd, yyyy · HH:mm')}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium capitalize">{record.type.replace('_', ' ')}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(new Date(record.timestamp), 'MMM dd, yyyy · HH:mm')}
-                        </p>
-                      </div>
+                      {record.location && (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <MapPin className="h-4 w-4" />
+                          <span className="hidden sm:inline">Location tracked</span>
+                        </div>
+                      )}
                     </div>
-                    {record.location && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span className="hidden sm:inline">Location tracked</span>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </TabsContent>
 
@@ -528,27 +543,37 @@ const AttendanceWidget = () => {
                   const recordDate = new Date(r.timestamp);
                   return recordDate >= startOfWeek(new Date()) && recordDate <= endOfWeek(new Date());
                 })
-                .map((record) => (
-                  <div key={record.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        record.type === 'check_in' ? 'bg-success/10' : 'bg-muted'
-                      }`}>
-                        {record.type === 'check_in' ? (
-                          <CheckCircle2 className="h-5 w-5 text-success" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium capitalize">{record.type.replace('_', ' ')}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(new Date(record.timestamp), 'MMM dd, yyyy · HH:mm')}
-                        </p>
+                .map((record) => {
+                  const checkInStatus = getCheckInStatus(record);
+                  return (
+                    <div key={record.id} className="flex items-center justify-between p-3 rounded-lg border">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          record.type === 'check_in' ? 'bg-success/10' : 'bg-muted'
+                        }`}>
+                          {record.type === 'check_in' ? (
+                            <CheckCircle2 className="h-5 w-5 text-success" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium capitalize">{record.type.replace('_', ' ')}</p>
+                            {checkInStatus && (
+                              <Badge className={`text-xs ${checkInStatus.color}`}>
+                                {checkInStatus.label}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(record.timestamp), 'MMM dd, yyyy · HH:mm')}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
             </TabsContent>
 
             <TabsContent value="month" className="space-y-2 mt-4">
@@ -557,27 +582,37 @@ const AttendanceWidget = () => {
                   const recordDate = new Date(r.timestamp);
                   return recordDate >= startOfMonth(new Date()) && recordDate <= endOfMonth(new Date());
                 })
-                .map((record) => (
-                  <div key={record.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        record.type === 'check_in' ? 'bg-success/10' : 'bg-muted'
-                      }`}>
-                        {record.type === 'check_in' ? (
-                          <CheckCircle2 className="h-5 w-5 text-success" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium capitalize">{record.type.replace('_', ' ')}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(new Date(record.timestamp), 'MMM dd, yyyy · HH:mm')}
-                        </p>
+                .map((record) => {
+                  const checkInStatus = getCheckInStatus(record);
+                  return (
+                    <div key={record.id} className="flex items-center justify-between p-3 rounded-lg border">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          record.type === 'check_in' ? 'bg-success/10' : 'bg-muted'
+                        }`}>
+                          {record.type === 'check_in' ? (
+                            <CheckCircle2 className="h-5 w-5 text-success" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium capitalize">{record.type.replace('_', ' ')}</p>
+                            {checkInStatus && (
+                              <Badge className={`text-xs ${checkInStatus.color}`}>
+                                {checkInStatus.label}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(record.timestamp), 'MMM dd, yyyy · HH:mm')}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
             </TabsContent>
 
             <TabsContent value="calendar" className="mt-4">
