@@ -9,7 +9,6 @@ import TaskCard from "./TaskCard";
 import TaskSearchFilter from "./TaskSearchFilter";
 import CreateTaskDialog from "./CreateTaskDialog";
 import EditTaskDialog from "./EditTaskDialog";
-import CreateColumnDialog from "./CreateColumnDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -44,7 +43,6 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
   const [columns, setColumns] = useState<TaskColumn[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isCreateColumnOpen, setIsCreateColumnOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -342,10 +340,6 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
       />
 
       <div className="flex justify-end gap-2">
-        <Button onClick={() => setIsCreateColumnOpen(true)} variant="outline">
-          <Plus className="h-4 w-4 mr-2" />
-          New Column
-        </Button>
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Task
@@ -407,11 +401,6 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
         onOpenChange={setIsCreateOpen}
         onTaskCreated={fetchTasks}
         columns={columns}
-      />
-      <CreateColumnDialog
-        open={isCreateColumnOpen}
-        onOpenChange={setIsCreateColumnOpen}
-        onColumnCreated={fetchColumns}
       />
       <EditTaskDialog
         task={selectedTask}
