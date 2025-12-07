@@ -244,6 +244,8 @@ const TaskBoard = ({ role }: { role: UserRole }) => {
         .eq('id', taskId);
 
       if (error) throw error;
+      
+      await fetchTasks();
 
       toast({
         title: "Success",

@@ -57,14 +57,19 @@ const Dashboard = () => {
 
   const loadStaffStats = async (userId: string) => {
     // Load tasks
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('status')
-      .eq('assignee_id', userId);
+    const {data:tasks, error} = await supabase
+        .from('tasks')
+        .select(`
+            id,
+            column_id,
+            task_columns:task_columns!inner(name)
+          `)
+        .eq('assignee_id', userId);
+
 
     const totalTasks = tasks?.length || 0;
-    const completedTasks = tasks?.filter(t => t.status === 'done').length || 0;
-    const pendingTasks = tasks?.filter(t => t.status !== 'done').length || 0;
+    const completedTasks = tasks?.filter(t => t.task_columns.name === 'Done').length || 0;
+    const pendingTasks = tasks?.filter(t => t.task_columns.name !== 'Done').length || 0;
 
     // Check today's attendance
     const today = new Date().toISOString().split('T')[0];
