@@ -20,8 +20,9 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [roomId, setRoomId] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [bookingDate, setBookingDate] = useState(""); // date only YYYY-MM-DD.
+  const [startTime, setStartTime] = useState(""); // time only HH:mm.
+  const [endTime, setEndTime] = useState(""); // time only HH:mm.
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -30,18 +31,20 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
     if (open) {
       fetchRooms();
       const today = new Date().toISOString().split('T')[0];
-      setStartTime(`${today}T09:00`);
-      setEndTime(`${today}T10:00`);
+
+      setBookingDate(today); // default date = today.
+      setStartTime("09:00"); // default start time.
+      setEndTime("10:00"); // default end time.
     }
   }, [open]);
 
   const fetchRooms = async () => {
     const { data } = await supabase
-      .from('meeting_rooms')
-      .select('id, name')
-      .eq('is_active', true)
-      .order('name');
-    
+        .from('meeting_rooms')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
     if (data) setRooms(data);
   };
 
@@ -93,23 +96,27 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
       const user = await getCurrentUser();
       if (!user) throw new Error("Not authenticated");
 
-      if (!title || !roomId || !startTime || !endTime) {
+      /* validate required fields, now bookingDate + times */
+      if (!title || !roomId || !bookingDate || !startTime || !endTime) {
         toast({ title: "Validation Error", description: "Please fill in all required fields", variant: "destructive" });
         setLoading(false);
         return;
       }
 
-      const startDate = startTime.split('T')[0];
-      const endDate = endTime.split('T')[0];
+      /* bookingDate is a single date; combine with time parts */
+      // Build Date objects from bookingDate + time strings
+      const startDateTimeStr = `${bookingDate}T${startTime}`; // local ISO-like without timezone
+      const endDateTimeStr = `${bookingDate}T${endTime}`;
 
-      if (startDate !== endDate) {
-        toast({ title: "Invalid Date Range", description: "Booking must be on the same day.", variant: "destructive" });
+      const startDateTime = new Date(startDateTimeStr).getTime();
+      const endDateTime = new Date(endDateTimeStr).getTime();
+
+      // Ensure start < end
+      if (isNaN(startDateTime) || isNaN(endDateTime)) {
+        toast({ title: "Invalid Date/Time", description: "Please provide valid date and time", variant: "destructive" });
         setLoading(false);
         return;
       }
-
-      const startDateTime = new Date(startTime).getTime();
-      const endDateTime = new Date(endTime).getTime();
 
       if (startDateTime >= endDateTime) {
         toast({ title: "Invalid Time Range", description: "End time must be after start time", variant: "destructive" });
@@ -118,8 +125,8 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
       }
 
       // convert to ISO for storage & checking (consistent tz)
-      const startISO = new Date(startTime).toISOString();
-      const endISO = new Date(endTime).toISOString();
+      const startISO = new Date(startDateTimeStr).toISOString();
+      const endISO = new Date(endDateTimeStr).toISOString();
 
       // Check conflict for the same room & same date
       const hasConflict = await checkTimeConflict(roomId, startISO, endISO);
@@ -130,18 +137,15 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
       }
 
       // Insert booking
-      const { data: bookingData, error } = await supabase
-          .from('room_bookings')
-          .insert([{
-            title,
-            description: description || null,
-            room_id: roomId,
-            user_id: user.id,
-            start_time: startISO,
-            end_time: endISO,
-            status: 'pending'
-          }])
-          .select();
+      const { data: bookingData, error } = await supabase.from('room_bookings').insert([{
+        title,
+        description: description || null,
+        room_id: roomId,
+        user_id: user.id,
+        start_time: startISO,
+        end_time: endISO,
+        status: 'pending'
+      }]).select();
 
       if (error) throw error;
 
@@ -183,88 +187,103 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
     setTitle("");
     setDescription("");
     setRoomId("");
-    setStartTime("");
-    setEndTime("");
+    /* reset date/time separately */
+    const today = new Date().toISOString().split('T')[0];
+    setBookingDate(today);
+    setStartTime("09:00");
+    setEndTime("10:00");
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Create Booking</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Meeting Title *</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="room">Room *</Label>
-            <Select value={roomId} onValueChange={setRoomId} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select room" />
-              </SelectTrigger>
-              <SelectContent>
-                {rooms.map((room) => (
-                  <SelectItem key={room.id} value={room.id}>
-                    {room.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Booking</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="start">Start Time *</Label>
+              <Label htmlFor="title">Meeting Title *</Label>
               <Input
-                id="start"
-                type="datetime-local"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                required
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
               />
             </div>
 
             <div>
-              <Label htmlFor="end">End Time *</Label>
-              <Input
-                id="end"
-                type="datetime-local"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                required
+              <Label htmlFor="room">Room *</Label>
+              <Select value={roomId} onValueChange={setRoomId} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select room" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rooms.map((room) => (
+                      <SelectItem key={room.id} value={room.id}>
+                        {room.name}
+                      </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date input + Time inputs (separated) */}
+            <div className="grid grid-cols-3 gap-4"> {/* 3 columns: Date, Start Time, End Time */}
+              <div>
+                <Label htmlFor="date">Date *</Label>
+                <Input
+                    id="date"
+                    type="date"
+                    value={bookingDate}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                    required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="start">Start Time *</Label>
+                <Input
+                    id="start"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="end">End Time *</Label>
+                <Input
+                    id="end"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
               />
             </div>
-          </div>
 
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Booking"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Creating..." : "Create Booking"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
   );
 };
 
