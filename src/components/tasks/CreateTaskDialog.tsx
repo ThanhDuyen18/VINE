@@ -31,6 +31,7 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, columns = [] }: C
   const [deadline, setDeadline] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [columnId, setColumnId] = useState("");
+  const [completedAt, setCompletedAt] = useState("");
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -63,6 +64,25 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, columns = [] }: C
       return;
     }
 
+    // Validate required fields: assignee and deadline
+    if (!assigneeId) {
+      toast({
+        title: "Error",
+        description: "Assignee is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!deadline) {
+      toast({
+        title: "Error",
+        description: "Deadline is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -77,6 +97,7 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, columns = [] }: C
         priority: priority as any,
         deadline: deadline || null,
         assignee_id: assigneeId || null,
+        completed_at: completedAt || null,
         creator_id: user.id,
         column_id: finalColumnId,
         status: 'todo'
@@ -137,6 +158,7 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, columns = [] }: C
     setDeadline("");
     setAssigneeId("");
     setColumnId("");
+    setCompletedAt("");
   };
 
   return (
@@ -189,6 +211,15 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, columns = [] }: C
                 type="date"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="completed_at">Completed Date (optional)</Label>
+              <Input
+                id="completed_at"
+                type="date"
+                value={completedAt}
+                onChange={(e) => setCompletedAt(e.target.value)}
               />
             </div>
           </div>

@@ -4,61 +4,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin } from "lucide-react";
+import { Clock } from "lucide-react";
 
 const AttendanceSettings = () => {
-  const [officeLocation, setOfficeLocation] = useState({ lat: "", lng: "" });
-  const [radius, setRadius] = useState("100");
+  const [onTime, setOnTime] = useState<string>("09:00");
   const { toast } = useToast();
 
   useEffect(() => {
     const savedSettings = localStorage.getItem('attendanceSettings');
     if (savedSettings) {
       const settings = JSON.parse(savedSettings);
-      setOfficeLocation(settings.officeLocation || { lat: "", lng: "" });
-      setRadius(settings.radius || "100");
+      setOnTime(settings.onTime || "09:00");
     }
   }, []);
 
-  const handleGetCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setOfficeLocation({
-            lat: position.coords.latitude.toString(),
-            lng: position.coords.longitude.toString()
-          });
-          toast({
-            title: "Location captured",
-            description: "Current location set as office location"
-          });
-        },
-        (error) => {
-          toast({
-            title: "Error",
-            description: "Failed to get current location",
-            variant: "destructive"
-          });
-        }
-      );
-    } else {
-      toast({
-        title: "Error",
-        description: "Geolocation is not supported by this browser",
-        variant: "destructive"
-      });
-    }
-  };
-
   const handleSave = () => {
     const settings = {
-      officeLocation,
-      radius
+      onTime
     };
     localStorage.setItem('attendanceSettings', JSON.stringify(settings));
     toast({
       title: "Success",
-      description: "Attendance settings saved"
+      description: "Attendance settings saved successfully"
     });
   };
 
@@ -66,66 +33,39 @@ const AttendanceSettings = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <MapPin className="h-5 w-5" />
-          Attendance Location Settings
+          <Clock className="h-5 w-5" />
+          Attendance Time Settings
         </CardTitle>
         <CardDescription>
-          Configure office location and check-in radius for attendance validation
+          Configure the on-time check-in cutoff time for employees
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         <div className="space-y-4">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label htmlFor="lat">Latitude</Label>
-              <Input
-                id="lat"
-                type="number"
-                step="any"
-                value={officeLocation.lat}
-                onChange={(e) => setOfficeLocation({ ...officeLocation, lat: e.target.value })}
-                placeholder="e.g., 21.028511"
-              />
-            </div>
-            <div className="flex-1">
-              <Label htmlFor="lng">Longitude</Label>
-              <Input
-                id="lng"
-                type="number"
-                step="any"
-                value={officeLocation.lng}
-                onChange={(e) => setOfficeLocation({ ...officeLocation, lng: e.target.value })}
-                placeholder="e.g., 105.804817"
-              />
-            </div>
+          <div>
+            <Label htmlFor="onTime">On-Time Check-in Cutoff</Label>
+            <Input
+              id="onTime"
+              type="time"
+              value={onTime}
+              onChange={(e) => setOnTime(e.target.value)}
+              className="mt-2"
+            />
+            <p className="text-sm text-muted-foreground mt-2">
+              Employees checking in after this time will be marked as late. 
+              <br />
+              Any check-in after this cutoff time will increase their late rate.
+            </p>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleGetCurrentLocation}
-            className="w-full"
-          >
-            <MapPin className="h-4 w-4 mr-2" />
-            Use Current Location
-          </Button>
-
-          <div>
-            <Label htmlFor="radius">Check-in Radius (meters)</Label>
-            <Input
-              id="radius"
-              type="number"
-              value={radius}
-              onChange={(e) => setRadius(e.target.value)}
-              placeholder="100"
-            />
-            <p className="text-sm text-muted-foreground mt-1">
-              Employees must be within this radius to check in/out
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-900">
+              <strong>Example:</strong> If you set on-time to 09:00, employees checking in at 09:01 or later will be marked as late.
             </p>
           </div>
 
           <div className="pt-4">
-            <Button onClick={handleSave} className="w-full">
+            <Button onClick={handleSave} className="w-full bg-primary hover:bg-primary/90">
               Save Settings
             </Button>
           </div>

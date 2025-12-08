@@ -19,7 +19,7 @@ const TaskList = ({ role }: { role: UserRole }) => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
-  const [taskTypeFilter, setTaskTypeFilter] = useState("all");
+  const [taskTypeFilter, setTaskTypeFilter] = useState(() => (role === 'admin' ? 'all' : 'assigned'));
   const [users, setUsers] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
 
@@ -89,9 +89,11 @@ const TaskList = ({ role }: { role: UserRole }) => {
   };
 
   useEffect(() => {
+    // Update default filter when role changes
+    setTaskTypeFilter(role === 'admin' ? 'all' : 'assigned');
     fetchTasks();
     fetchUsers();
-  }, []);
+  }, [role]);
 
   if (loading) {
     return <SkeletonTable rows={8} columns={6} />;
@@ -245,6 +247,8 @@ const TaskList = ({ role }: { role: UserRole }) => {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         onTaskUpdated={fetchTasks}
+        role={role}
+        currentUserId={currentUserId}
       />
     </div>
   );
