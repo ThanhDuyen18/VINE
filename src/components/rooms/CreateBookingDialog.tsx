@@ -45,32 +45,45 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
     if (data) setRooms(data);
   };
 
-  const checkTimeConflict = async (roomId: string, startTime: string, endTime: string): Promise<boolean> => {
-    try {
-      const { data, error } = await supabase
+  async function checkTimeConflict(roomId: string, startISO: string, endISO: string) {
+    // startISO/endISO are full ISO strings from input (local -> toISOString later)
+    const startDate = startISO.split('T')[0]; // yyyy-mm-dd
+    const dayStart = new Date(`${startDate}T00:00:00`).toISOString();
+    const dayEnd = new Date(`${startDate}T23:59:59.999`).toISOString();
+
+    // Fetch all bookings for that room on that date (excluding cancelled/canceled if you have that status)
+    const { data: bookings, error } = await supabase
         .from('room_bookings')
-        .select('*')
+        .select('id, start_time, end_time, status')
         .eq('room_id', roomId)
-        .eq('status', 'approved');
+        .gte('start_time', dayStart)
+        .lte('start_time', dayEnd);
 
-      if (error) throw error;
-
-      const start = new Date(startTime).getTime();
-      const end = new Date(endTime).getTime();
-
-      const hasConflict = data?.some(booking => {
-        const existingStart = new Date(booking.start_time).getTime();
-        const existingEnd = new Date(booking.end_time).getTime();
-
-        return !(end <= existingStart || start >= existingEnd);
-      });
-
-      return hasConflict || false;
-    } catch (error) {
-      console.error('Error checking time conflict:', error);
-      return false;
+    if (error) {
+      console.error('Error fetching existing bookings for conflict check:', error);
+      // Be conservative: if we can't fetch, assume conflict to avoid double-booking
+      return true;
     }
-  };
+
+    const startMs = new Date(startISO).getTime();
+    const endMs = new Date(endISO).getTime();
+
+    // Overlap condition: start < existing.end && end > existing.start
+    for (const b of bookings || []) {
+      // Optional: ignore cancelled/rejected bookings if you treat them as non-conflicting
+      if (b.status === 'cancelled' || b.status === 'rejected') continue;
+
+      const bStart = new Date(b.start_time).getTime();
+      const bEnd = new Date(b.end_time).getTime();
+
+      if (startMs < bEnd && endMs > bStart) {
+        // overlapping time range in same room -> conflict
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,11 +94,7 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
       if (!user) throw new Error("Not authenticated");
 
       if (!title || !roomId || !startTime || !endTime) {
-        toast({
-          title: "Validation Error",
-          description: "Please fill in all required fields",
-          variant: "destructive"
-        });
+        toast({ title: "Validation Error", description: "Please fill in all required fields", variant: "destructive" });
         setLoading(false);
         return;
       }
@@ -94,11 +103,7 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
       const endDate = endTime.split('T')[0];
 
       if (startDate !== endDate) {
-        toast({
-          title: "Invalid Date Range",
-          description: "Booking must be on the same day. Please select start and end times on the same date.",
-          variant: "destructive"
-        });
+        toast({ title: "Invalid Date Range", description: "Booking must be on the same day.", variant: "destructive" });
         setLoading(false);
         return;
       }
@@ -107,52 +112,49 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
       const endDateTime = new Date(endTime).getTime();
 
       if (startDateTime >= endDateTime) {
-        toast({
-          title: "Invalid Time Range",
-          description: "End time must be after start time",
-          variant: "destructive"
-        });
+        toast({ title: "Invalid Time Range", description: "End time must be after start time", variant: "destructive" });
         setLoading(false);
         return;
       }
 
-      const hasConflict = await checkTimeConflict(roomId, startTime, endTime);
+      // convert to ISO for storage & checking (consistent tz)
+      const startISO = new Date(startTime).toISOString();
+      const endISO = new Date(endTime).toISOString();
+
+      // Check conflict for the same room & same date
+      const hasConflict = await checkTimeConflict(roomId, startISO, endISO);
       if (hasConflict) {
-        toast({
-          title: "Booking Conflict",
-          description: "This room is already booked for the selected time. Please choose a different time or room.",
-          variant: "destructive"
-        });
+        toast({ title: "Booking Conflict", description: "This room is already booked for the selected time.", variant: "destructive" });
         setLoading(false);
         return;
       }
 
-      const startTimeUTC = new Date(startTime).toISOString();
-      const endTimeUTC = new Date(endTime).toISOString();
-
-      const { data: bookingData, error } = await supabase.from('room_bookings').insert([{
-        title,
-        description: description || null,
-        room_id: roomId,
-        user_id: user.id,
-        start_time: startTimeUTC,
-        end_time: endTimeUTC,
-        status: 'pending'
-      }]).select();
+      // Insert booking
+      const { data: bookingData, error } = await supabase
+          .from('room_bookings')
+          .insert([{
+            title,
+            description: description || null,
+            room_id: roomId,
+            user_id: user.id,
+            start_time: startISO,
+            end_time: endISO,
+            status: 'pending'
+          }])
+          .select();
 
       if (error) throw error;
 
-      // Create notification for admins/leaders about new booking
+      // notify admins/leaders (unchanged)
       const { data: adminUsers } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .in('role', ['admin', 'leader'])
-        .neq('user_id', user.id);
+          .from('user_roles')
+          .select('user_id')
+          .in('role', ['admin', 'leader'])
+          .neq('user_id', user.id);
 
       if (adminUsers && adminUsers.length > 0) {
         const roomData = rooms.find(r => r.id === roomId);
         const roomName = roomData?.name || 'Unknown Room';
-
         for (const admin of adminUsers) {
           await createNotification({
             userId: admin.user_id,
@@ -164,21 +166,14 @@ const CreateBookingDialog = ({ open, onOpenChange, onBookingCreated }: CreateBoo
         }
       }
 
-      toast({
-        title: "Success",
-        description: "Booking created successfully"
-      });
-
+      toast({ title: "Success", description: "Booking created successfully" });
       onBookingCreated();
       onOpenChange(false);
       resetForm();
+
     } catch (error) {
       console.error('Error creating booking:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create booking",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to create booking", variant: "destructive" });
     } finally {
       setLoading(false);
     }
